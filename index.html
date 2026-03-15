@@ -25,8 +25,9 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        body { font-family: 'Inter', sans-serif; overflow: hidden; background: #ffffff; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; overflow: hidden; background: #f1f5f9; -webkit-tap-highlight-color: transparent; }
         
+        /* 印刷設定: 実寸(mm)を厳密に維持 */
         @media print {
             @page { margin: 0; size: A4; }
             body { background: white !important; margin: 0; padding: 0; }
@@ -37,23 +38,30 @@
                 position: absolute; left: 0; top: 0; width: 210mm; height: 297mm; 
                 background: white !important; margin: 0; padding: 0;
             }
+            .paper-shadow { box-shadow: none !important; border: none !important; }
         }
 
         .scrollbar-hide::-webkit-scrollbar { display: none; }
+        
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; appearance: none; width: 16px; height: 16px; 
             background: #4f46e5; cursor: pointer; border-radius: 50%; border: 2px solid white; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }
+
         .context-menu {
             position: fixed; background: white; border: 1px solid #e2e8f0; 
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 12px; padding: 8px; z-index: 1000; min-width: 180px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1); border-radius: 12px; 
+            padding: 8px; z-index: 1000; min-width: 180px;
         }
+
         .loader { border: 3px solid #f3f3f3; border-top: 3px solid #6366f1; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         .toast {
-            position: fixed; bottom: env(safe-area-inset-bottom, 24px); right: 24px; 
-            background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; font-size: 12px; font-weight: 800; z-index: 2000; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: fixed; bottom: 24px; right: 24px; 
+            background: #1e293b; color: white; padding: 12px 24px; border-radius: 12px; 
+            font-size: 12px; font-weight: 800; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); 
+            z-index: 2000; animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
         @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
@@ -64,6 +72,11 @@
         }
         
         .dropper-active { cursor: crosshair !important; }
+
+        .paper-shadow {
+            box-shadow: 0 0 40px rgba(0,0,0,0.1), 0 0 10px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
     </style>
 </head>
 <body>
@@ -72,11 +85,10 @@
     <script type="text/babel">
         const { useState, useRef, useEffect, useCallback, useMemo } = React;
 
-        // --- 1. 定数と初期設定 ---
+        // --- 1. 定数 ---
         const A4_WIDTH = 210;
         const A4_HEIGHT = 297;
         const WORKSPACE_MARGIN = 40;
-        const SVG_PADDING = 1;
 
         const IPHONE_MODELS = {
             iphone16e: { 
@@ -120,35 +132,39 @@
             Printer: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
             Trash2: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
             Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
-            Save: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Save: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
             Sparkles: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
             Magnet: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m6 15-4-4 6.7-6.7c.9-.9 2.3-.9 3.2 0l4.2 4.2c.9.9.9 2.3 0 3.2L9.4 18.4A4.48 4.48 0 0 1 6.3 19.7c-1.3 0-2.5-.5-3.5-1.5L6 15Z"/><path d="m9 18-4-4"/><path d="m17 13 4-4"/><path d="m15 10 4-4"/></svg>,
             ChevronDown: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>,
             ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
             Download: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
             Upload: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
-            Dropper: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m10 2 2 2c.6.6.6 1.4 0 2l-1 1 5 5 1-1c.6-.6 1.4-.6 2 0l2 2c.6.6.6 1.4 0 2l-7 7c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l1-1-5-5-1 1c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l7-7Z"/><path d="m15 15-2-2"/></svg>,
+            Dropper: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m10 2 2 2c.6.6.6 1.4 0 2l-1 1 5 5 1-1c.6-.6 1.4-.6 2 0l2 2c.6.6.6 1.4 0 2l-7 7c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l1-1-5-5-1 1c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l7-7Z"/></svg>,
             CheckSquare: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+            AlignLeft: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 2v20"/><path d="M20 6H8"/><path d="M16 12H8"/><path d="M18 18H8"/></svg>,
+            AlignCenterH: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 2v20"/><path d="M20 12H4"/><path d="M17 7H7"/><path d="M17 17H7"/></svg>,
+            AlignRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M20 2v20"/><path d="M4 6h12"/><path d="M8 12h12"/><path d="M6 18h12"/></svg>,
+            AlignTop: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M2 4h20"/><path d="M6 20V8"/><path d="M12 16V8"/><path d="M18 18V8"/></svg>,
             Folder: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
             ImageIcon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
         };
 
         // --- 3. サブコンポーネント ---
         const ParamItem = ({ label, val, onChange, max = 100, step = 0.1, unit = "mm" }) => (
-            <div className="space-y-1.5 group text-[10px] font-bold">
-                <div className="flex justify-between items-center uppercase text-slate-500 tracking-tighter">
+            <div className="space-y-1 group text-[10px] font-bold">
+                <div className="flex justify-between items-center uppercase text-slate-500">
                     <span>{label}</span>
                     <div className="flex items-center gap-1">
-                        <input type="number" step={step} value={val} onChange={e => onChange(e.target.value)} className="w-14 bg-slate-50 border rounded-xl text-right px-2 py-1 font-mono text-indigo-600 outline-none focus:bg-white shadow-sm" />
+                        <input type="number" step={step} value={val} onChange={e => onChange(e.target.value)} className="w-14 bg-slate-50 border rounded-lg text-right px-1.5 py-1 font-mono text-indigo-600 outline-none focus:bg-white" />
                         <span className="text-[8px] text-slate-300">{unit}</span>
                     </div>
                 </div>
-                <input type="range" min="0" max={max} step={step} value={val} onChange={e => onChange(e.target.value)} className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer" />
+                <input type="range" min="0" max={max} step={step} value={val} onChange={e => onChange(e.target.value)} className="w-full accent-indigo-600 h-1 bg-slate-200 rounded-lg appearance-none cursor-pointer" />
             </div>
         );
 
         const Skin = ({ p, ls, uniqueId, interactive, magsafe, mWidth, handlers, selectedLayerId, scale, showChecker }) => {
-            const clipId = `body-clip-${uniqueId}`, maskId = `cam-mask-${uniqueId}`, sw = 0.3;
+            const clipId = `body-clip-${uniqueId}`, maskId = `cam-mask-${uniqueId}`;
             return (
                 <g>
                     <defs>
@@ -162,22 +178,19 @@
                         </mask>
                         <pattern id="checkerPattern" width="10" height="10" patternUnits="userSpaceOnUse">
                             <rect width="10" height="10" fill="white" />
-                            <rect width="5" height="5" fill="#f0f0f0" />
-                            <rect x="5" y="5" width="5" height="5" fill="#f0f0f0" />
+                            <rect width="5" height="5" fill="#f1f5f9" /><rect x="5" y="5" width="5" height="5" fill="#f1f5f9" />
                         </pattern>
                     </defs>
                     
-                    {showChecker && (
-                        <rect width={p.width} height={p.height} fill="url(#checkerPattern)" clipPath={`url(#${clipId})`} mask={`url(#${maskId})`} />
-                    )}
+                    {showChecker && <rect width={p.width} height={p.height} fill="url(#checkerPattern)" clipPath={`url(#${clipId})`} mask={`url(#${maskId})`} />}
 
                     <g clipPath={`url(#${clipId})`} mask={`url(#${maskId})`}>
                         {ls.map(l => (
-                            <g key={`content-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} onContextMenu={(e) => handlers.onCtx && handlers.onCtx(e, l.id)} onClick={(e) => handlers.onClick && handlers.onClick(e, l.id)}>
+                            <g key={`${uniqueId}-content-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} onContextMenu={(e) => handlers.onCtx && handlers.onCtx(e, l.id)} onClick={(e) => handlers.onClick && handlers.onClick(e, l.id)}>
                                 {l.type === 'image' ? (
                                     <image href={l.src} x={l.x - l.w/2} y={l.y - l.h/2} width={l.w} height={l.h} opacity={l.opacity} style={{ cursor: interactive ? 'move' : 'default' }} onMouseDown={(e) => interactive && handlers.onDown && handlers.onDown(e, 'move', l.id)} />
                                 ) : (
-                                    <text x={l.x} y={l.y} fontSize={l.fontSize} fill={l.color} textAnchor="middle" dominantBaseline="middle" opacity={l.opacity} style={{ paintOrder: 'stroke fill', fontWeight: l.fontWeight, userSelect: 'none', cursor: interactive ? 'move' : 'default' }} onMouseDown={(e) => interactive && handlers.onDown && handlers.onDown(e, 'move', l.id)}>{l.text}</text>
+                                    <text x={l.x} y={l.y} fontSize={l.fontSize} fill={l.color} textAnchor="middle" dominantBaseline="middle" opacity={l.opacity} style={{ paintOrder: 'stroke fill', fontWeight: '900', userSelect: 'none', cursor: interactive ? 'move' : 'default' }} onMouseDown={(e) => interactive && handlers.onDown && handlers.onDown(e, 'move', l.id)}>{l.text}</text>
                                 )}
                             </g>
                         ))}
@@ -187,37 +200,32 @@
                         <g opacity="0.15" pointerEvents="none" className="no-print">
                             <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth={mWidth} strokeOpacity="0.6" />
                             <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth="0.2" strokeDasharray="1,1" />
-                            <rect x={p.width/2 - 2.5} y={p.magsafeY + 31} width="5" height="11" rx="2.5" fill="#000" fillOpacity="0.5" />
                         </g>
                     )}
 
-                    <rect x={sw/2} y={sw/2} width={p.width - sw} height={p.height - sw} rx={p.cornerRadius - sw/2} fill="none" stroke="#334155" strokeWidth={sw} pointerEvents="none" />
+                    <rect width={p.width} height={p.height} rx={p.cornerRadius} fill="none" stroke="#334155" strokeWidth={0.3} pointerEvents="none" />
                     <rect x={p.cameraBox.x} y={p.cameraBox.y} width={p.cameraBox.w} height={p.cameraBox.h} rx={p.cameraBox.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />
                     
                     <g fill="none" stroke="#334155" strokeWidth="0.1">
                         {p.cameraType === 'single-lens' ? (
                             <circle cx={p.cameraBox.x + p.cameraBox.w/2} cy={p.cameraBox.y + p.cameraBox.h/2} r="8" />
-                        ) : p.cameraType === 'pill-vertical' ? (
+                        ) : (
                             <>
                                 <circle cx={p.cameraBox.x + p.cameraBox.w/2} cy={p.cameraBox.y + 10} r="8" />
                                 <circle cx={p.cameraBox.x + p.cameraBox.w/2} cy={p.cameraBox.y + 29} r="8" />
                             </>
-                        ) : null}
+                        )}
                     </g>
-
                     {p.flash && <circle cx={p.flash.x} cy={p.flash.y} r={p.flash.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />}
 
                     {interactive && ls.map(l => {
                         if (selectedLayerId !== l.id) return null;
-                        const h_w = l.type === 'image' ? l.w : l.fontSize * 4, h_h = l.type === 'image' ? l.h : l.fontSize;
+                        const hw = l.type === 'image' ? l.w : l.fontSize * 4, hh = l.type === 'image' ? l.h : l.fontSize;
                         return (
-                            <g key={`handle-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} pointerEvents="none">
-                                <g transform={`translate(${l.x}, ${l.y})`}>
-                                    <rect x={-h_w/2} y={-h_h/2} width={h_w} height={h_h} fill="none" stroke="#6366f1" strokeWidth={1.5/scale} strokeDasharray="2,2" />
-                                    <circle cx={h_w/2} cy={h_h/2} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'nwse-resize', pointerEvents: 'all' }} onMouseDown={(e) => handlers.onDown(e, 'resize', l.id)} />
-                                    <line x1="0" y1={-h_h/2} x2="0" y2={-h_h/2 - 25/scale} stroke="#6366f1" strokeWidth={2/scale} />
-                                    <circle cx="0" cy={-h_h/2 - 25/scale} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'alias', pointerEvents: 'all' }} onMouseDown={(e) => handlers.onDown(e, 'rotate', l.id)} />
-                                </g>
+                            <g key={`${uniqueId}-handle-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} pointerEvents="none">
+                                <rect x={l.x-hw/2} y={l.y-hh/2} width={hw} height={hh} fill="none" stroke="#6366f1" strokeWidth={1/scale} strokeDasharray="2,2" />
+                                <circle cx={l.x+hw/2} cy={l.y+hh/2} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2/scale} pointerEvents="all" style={{ cursor: 'nwse-resize' }} onMouseDown={(e) => handlers.onDown(e, 'resize', l.id)} />
+                                <circle cx={l.x} cy={l.y-hh/2-20/scale} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2/scale} pointerEvents="all" style={{ cursor: 'alias' }} onMouseDown={(e) => handlers.onDown(e, 'rotate', l.id)} />
                             </g>
                         );
                     })}
@@ -226,17 +234,16 @@
         };
 
         const App = () => {
-            const [user, setUser] = useState(null);
-            const [projects, setProjects] = useState([]);
-            const [selectedModel, setSelectedModel] = useState('standard');
-            const [params, setParams] = useState(IPHONE_MODELS.standard);
+            // --- 4. ステート宣言 (ReferenceErrorを防ぐために最上部に配置) ---
+            const [selectedModel, setSelectedModel] = useState('iphone16e');
+            const [params, setParams] = useState(IPHONE_MODELS.iphone16e);
             const [layers, setLayers] = useState([]);
             const [selectedLayerId, setSelectedLayerId] = useState(null);
-            const [showMagSafe, setShowMagSafe] = useState(false);
-            const [magSafeWidth, setMagSafeWidth] = useState(5.0);
-            const [isPrintMode, setIsPrintMode] = useState(false);
             const [printItems, setPrintItems] = useState([]);
             const [selectedPrintItemIds, setSelectedPrintItemIds] = useState([]);
+            const [isPrintMode, setIsPrintMode] = useState(false);
+            const [showMagSafe, setShowMagSafe] = useState(false);
+            const [magSafeWidth, setMagSafeWidth] = useState(5.0);
             const [activeTab, setActiveTab] = useState('template');
             const [scale, setScale] = useState(3.5);
             const [projectName, setProjectName] = useState("");
@@ -244,19 +251,19 @@
             const [contextMenu, setContextMenu] = useState(null);
             const [isDropperActive, setIsDropperActive] = useState(false);
             const [showChecker, setShowChecker] = useState(false);
+            const [interaction, setInteraction] = useState({ type: null, startX: 0, startY: 0, initialLayer: null, initialItems: [] });
 
             const mainRef = useRef(null);
             const svgRef = useRef(null);
-            const [interaction, setInteraction] = useState({ type: null, startX: 0, startY: 0, initialLayer: null, initialItems: [] });
 
-            // --- Handlers ---
+            // --- 5. ハンドラー群 ---
             const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); }, []);
 
             const updateScale = useCallback(() => {
                 if (!mainRef.current) return;
                 const { offsetWidth, offsetHeight } = mainRef.current;
-                const targetW = isPrintMode ? A4_WIDTH : params.width + (WORKSPACE_MARGIN * 2);
-                const targetH = isPrintMode ? A4_HEIGHT : params.height + (WORKSPACE_MARGIN * 2);
+                const targetW = isPrintMode ? A4_WIDTH : params.width + WORKSPACE_MARGIN * 2;
+                const targetH = isPrintMode ? A4_HEIGHT : params.height + WORKSPACE_MARGIN * 2;
                 setScale(Math.max(0.5, Math.min((offsetWidth - 60) / targetW, (offsetHeight - 60) / targetH, 8.0)));
             }, [isPrintMode, params.width, params.height]);
 
@@ -266,57 +273,32 @@
                 else setParams(p => ({ ...p, [key]: num }));
             }, []);
 
-            const handleMouseDown = useCallback((e, type, layerId) => {
-                if (isDropperActive) return;
-                e.stopPropagation(); setContextMenu(null);
-                const layer = layers.find(l => l.id === layerId);
-                if (!layer) return;
-                setSelectedLayerId(layerId);
-                setInteraction({ type, startX: e.clientX, startY: e.clientY, initialLayer: { ...layer } });
-            }, [layers, isDropperActive]);
-
-            const handleContextMenu = useCallback((e, layerId) => {
-                if (isPrintMode || isDropperActive) return;
-                e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layerId); setContextMenu({ x: e.clientX, y: e.clientY, layerId });
-            }, [isPrintMode, isDropperActive]);
-
-            const processChromaKey = useCallback((originalSrc, keyColor, tolerance) => {
-                return new Promise((resolve) => {
-                    const img = new Image();
-                    img.src = originalSrc;
+            const processChromaKey = useCallback((originalSrc, color, tolerance) => {
+                return new Promise(resolve => {
+                    const img = new Image(); img.src = originalSrc;
                     img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        canvas.width = img.width; canvas.height = img.height;
-                        const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0);
-                        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                        const data = imageData.data;
-                        const hexToRgb = (hex) => {
-                            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                            return result ? [parseInt(result[1], 16), parseInt(result[2], 16), parseInt(result[3], 16)] : [0,0,0];
-                        };
-                        const targetRgb = hexToRgb(keyColor);
-                        for (let i = 0; i < data.length; i += 4) {
-                            const r = data[i], g = data[i+1], b = data[i+2];
-                            const diff = Math.sqrt(Math.pow(r - targetRgb[0], 2) + Math.pow(g - targetRgb[1], 2) + Math.pow(b - targetRgb[2], 2));
-                            if (diff < tolerance) data[i+3] = 0;
+                        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+                        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+                        const id = ctx.getImageData(0,0,c.width,c.height); const d = id.data;
+                        const target = color.match(/[A-Za-z0-9]{2}/g).map(v => parseInt(v, 16));
+                        for(let i=0; i<d.length; i+=4) {
+                            const diff = Math.sqrt(Math.pow(d[i]-target[0],2) + Math.pow(d[i+1]-target[1],2) + Math.pow(d[i+2]-target[2],2));
+                            if(diff < tolerance) d[i+3] = 0;
                         }
-                        ctx.putImageData(imageData, 0, 0);
-                        resolve(canvas.toDataURL());
+                        ctx.putImageData(id, 0, 0); resolve(c.toDataURL());
                     };
                 });
             }, []);
 
             const updateLayer = useCallback(async (id, updates) => {
                 setLayers(prev => {
-                    const idx = prev.findIndex(l => l.id === id);
-                    if (idx === -1) return prev;
-                    const l = { ...prev[idx], ...updates };
-                    const next = [...prev]; next[idx] = l;
-                    if (l.type === 'image' && (updates.chromaKeyEnabled !== undefined || updates.chromaKeyColor !== undefined || updates.chromaKeyTolerance !== undefined)) {
+                    const idx = prev.findIndex(l => l.id === id); if(idx === -1) return prev;
+                    const layer = { ...prev[idx], ...updates };
+                    const next = [...prev]; next[idx] = layer;
+                    if(layer.type === 'image' && (updates.chromaKeyEnabled !== undefined || updates.chromaKeyColor !== undefined || updates.chromaKeyTolerance !== undefined)) {
                         (async () => {
-                            const src = l.chromaKeyEnabled ? await processChromaKey(l.originalSrc, l.chromaKeyColor, l.chromaKeyTolerance) : l.originalSrc;
-                            setLayers(current => current.map(cl => cl.id === id ? { ...cl, src } : cl));
+                            const src = layer.chromaKeyEnabled ? await processChromaKey(layer.originalSrc, layer.chromaKeyColor, layer.chromaKeyTolerance) : layer.originalSrc;
+                            setLayers(curr => curr.map(l => l.id === id ? { ...l, src } : l));
                         })();
                     }
                     return next;
@@ -324,104 +306,104 @@
             }, [processChromaKey]);
 
             const pickColorFromCanvas = useCallback((e, layerId) => {
-                if (!isDropperActive) return;
+                if(!isDropperActive) return;
                 const layer = layers.find(l => l.id === layerId);
-                if (!layer || layer.type !== 'image') return;
-                const svgRect = svgRef.current.getBoundingClientRect();
-                const clickX = (e.clientX - svgRect.left) / scale - WORKSPACE_MARGIN;
-                const clickY = (e.clientY - svgRect.top) / scale - WORKSPACE_MARGIN;
-                const relX = (clickX - (layer.x - layer.w / 2)) / layer.w;
-                const relY = (clickY - (layer.y - layer.h / 2)) / layer.h;
-                if (relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
+                if(!layer || layer.type !== 'image') return;
+                const rect = svgRef.current.getBoundingClientRect();
+                const clickX = (e.clientX - rect.left) / scale - WORKSPACE_MARGIN;
+                const clickY = (e.clientY - rect.top) / scale - WORKSPACE_MARGIN;
+                const relX = (clickX - (layer.x - layer.w/2)) / layer.w;
+                const relY = (clickY - (layer.y - layer.h/2)) / layer.h;
+                if(relX < 0 || relX > 1 || relY < 0 || relY > 1) return;
                 const img = new Image(); img.src = layer.originalSrc;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas'); canvas.width = img.width; canvas.height = img.height;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0);
-                    const pixel = ctx.getImageData(Math.floor(relX * img.width), Math.floor(relY * img.height), 1, 1).data;
-                    const hex = "#" + ("000000" + ((pixel[0] << 16) | (pixel[1] << 8) | pixel[2]).toString(16)).slice(-6);
+                    const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+                    const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
+                    const p = ctx.getImageData(Math.floor(relX * img.width), Math.floor(relY * img.height), 1, 1).data;
+                    const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6);
                     updateLayer(layerId, { chromaKeyColor: hex, chromaKeyEnabled: true });
                     setIsDropperActive(false); showToast("色を抽出しました");
                 };
             }, [isDropperActive, layers, scale, updateLayer, showToast]);
+
+            const handleMouseDown = useCallback((e, type, id) => {
+                if(isDropperActive) return; e.stopPropagation();
+                setContextMenu(null);
+                if(isPrintMode) {
+                    const item = printItems.find(i => i.id === id); if(!item) return;
+                    setSelectedPrintItemIds(prev => e.shiftKey ? [...prev, id] : [id]);
+                    setInteraction({ type: 'move_print', startX: e.clientX, startY: e.clientY, initialItems: printItems.filter(i => (e.shiftKey ? [...selectedPrintItemIds, id].includes(i.id) : i.id === id)).map(i => ({...i})) });
+                } else {
+                    const layer = layers.find(l => l.id === id); if(!layer) return;
+                    setSelectedLayerId(id);
+                    setInteraction({ type, startX: e.clientX, startY: e.clientY, initialLayer: { ...layer } });
+                }
+            }, [isDropperActive, isPrintMode, printItems, selectedPrintItemIds, layers]);
+
+            const handleContextMenu = useCallback((e, layerId) => {
+                if (isPrintMode || isDropperActive) return;
+                e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layerId); setContextMenu({ x: e.clientX, y: e.clientY, layerId });
+            }, [isPrintMode, isDropperActive]);
+
+            const addToPaper = useCallback(() => {
+                const newItem = { id: Date.now(), x: 10, y: 10, rotate: 0, snapshotLayers: JSON.parse(JSON.stringify(layers)), snapshotParams: JSON.parse(JSON.stringify(params)) };
+                setPrintItems(prev => [...prev, newItem]); setSelectedPrintItemIds([newItem.id]); setIsPrintMode(true); setActiveTab('layers');
+            }, [layers, params]);
 
             const deleteActiveSelection = useCallback(() => {
                 if (isPrintMode) { setPrintItems(prev => prev.filter(i => !selectedPrintItemIds.includes(i.id))); setSelectedPrintItemIds([]); }
                 else if (selectedLayerId) { setLayers(prev => prev.filter(l => l.id !== selectedLayerId)); setSelectedLayerId(null); }
             }, [isPrintMode, selectedPrintItemIds, selectedLayerId]);
 
-            const addToPaper = useCallback(() => {
-                const newItem = {
-                    id: "print-" + Date.now() + Math.random(), 
-                    x: 10 + (printItems.length * 5), y: 10 + (printItems.length * 5),
-                    rotate: 0, snapshotLayers: JSON.parse(JSON.stringify(layers)), 
-                    snapshotParams: JSON.parse(JSON.stringify({...params, showMagSafe}))
-                };
-                setPrintItems(prev => [...prev, newItem]); setSelectedPrintItemIds([newItem.id]); setIsPrintMode(true); setActiveTab('layers'); 
-            }, [layers, params, printItems.length, showMagSafe]);
-
             const exportToJson = useCallback(() => {
-                const name = projectName || "iphone-skin-project";
-                const data = { version: "1.4", projectName: name, selectedModel, params, layers, printItems, showMagSafe };
+                const data = { version: "1.5", projectName, selectedModel, params, layers, printItems, showMagSafe };
                 const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a'); link.href = url; link.download = `${name}.json`;
-                document.body.appendChild(link); link.click(); document.body.removeChild(link);
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${projectName || 'project'}.json`; a.click();
                 showToast("JSON保存完了");
             }, [projectName, selectedModel, params, layers, printItems, showMagSafe, showToast]);
 
             const importFromJson = useCallback((e) => {
-                const file = e.target.files[0]; if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (ev) => {
+                const f = e.target.files[0]; if(!f) return;
+                const r = new FileReader(); r.onload = (ev) => {
                     try {
-                        const data = JSON.parse(ev.target.result);
-                        if (data.params && data.layers) {
-                            setProjectName(data.projectName || ""); setSelectedModel(data.selectedModel || 'standard');
-                            setParams(data.params); setLayers(data.layers); setPrintItems(data.printItems || []);
-                            setShowMagSafe(data.showMagSafe || false); showToast("読込完了");
+                        const d = JSON.parse(ev.target.result);
+                        if(d.params && d.layers) {
+                            setProjectName(d.projectName || ""); setParams(d.params); setLayers(d.layers); setPrintItems(d.printItems || []);
+                            setSelectedModel(d.selectedModel || 'standard'); showToast("読み込み完了");
                         }
-                    } catch (err) { showToast("無効なJSONです"); }
-                };
-                reader.readAsText(file); e.target.value = "";
+                    } catch(err) { showToast("無効なJSONです"); }
+                }; r.readAsText(f); e.target.value = "";
             }, [showToast]);
 
-            // --- Effects ---
-            useEffect(() => {
-                const fb = window.firebase;
-                if (!fb || !CONFIG.firebase) return;
-                if (fb.apps.length === 0) fb.initializeApp(CONFIG.firebase);
-                fb.auth().signInAnonymously().catch(() => {});
-                return fb.auth().onAuthStateChanged(setUser);
-            }, []);
-
-            useEffect(() => {
-                updateScale(); window.addEventListener('resize', updateScale);
-                return () => window.removeEventListener('resize', updateScale);
-            }, [updateScale]);
-
+            // --- 6. Effects ---
             useEffect(() => {
                 const onMove = (e) => {
-                    if (!interaction.type) return;
+                    if(!interaction.type) return;
                     const dx = (e.clientX - interaction.startX) / scale, dy = (e.clientY - interaction.startY) / scale;
-                    if (interaction.type === 'move_print') {
-                        setPrintItems(p => p.map(it => { const init = interaction.initialItems.find(ii => ii.id === it.id); return init ? { ...it, x: init.x + dx, y: init.y + dy } : it; }));
-                    } else if (interaction.type === 'move') {
-                        setLayers(p => p.map(l => l.id === interaction.initialLayer.id ? { ...l, x: interaction.initialLayer.x + dx, y: interaction.initialLayer.y + dy } : l));
-                    } else if (interaction.type === 'rotate') {
+                    if(interaction.type === 'move_print') {
+                        setPrintItems(prev => prev.map(it => {
+                            const init = interaction.initialItems.find(ii => ii.id === it.id);
+                            return init ? { ...it, x: init.x + dx, y: init.y + dy } : it;
+                        }));
+                    } else if(interaction.type === 'move') {
+                        updateLayer(interaction.initialLayer.id, { x: interaction.initialLayer.x + dx, y: interaction.initialLayer.y + dy });
+                    } else if(interaction.type === 'resize') {
+                        updateLayer(interaction.initialLayer.id, { w: Math.max(2, interaction.initialLayer.w + dx*2), h: Math.max(2, interaction.initialLayer.h + dy*2) });
+                    } else if(interaction.type === 'rotate') {
                         const rect = mainRef.current.getBoundingClientRect();
-                        const cx = rect.left + ((params.width/2 + WORKSPACE_MARGIN) * scale);
-                        const cy = rect.top + ((params.height/2 + WORKSPACE_MARGIN) * scale);
+                        const cx = rect.left + (params.width/2 + WORKSPACE_MARGIN) * scale;
+                        const cy = rect.top + (params.height/2 + WORKSPACE_MARGIN) * scale;
                         let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) + 90;
-                        setLayers(p => p.map(l => l.id === interaction.initialLayer.id ? { ...l, rotate: Math.round(angle) } : l));
-                    } else if (interaction.type === 'resize') {
-                        // 拡大縮小ロジックを修正
-                        setLayers(p => p.map(l => l.id === interaction.initialLayer.id ? { ...l, w: Math.max(2, interaction.initialLayer.w + dx), h: Math.max(2, interaction.initialLayer.h + dy) } : l));
+                        if(e.ctrlKey) angle = Math.round(angle / 45) * 45;
+                        updateLayer(interaction.initialLayer.id, { rotate: Math.round(angle) });
                     }
                 };
                 const onUp = () => setInteraction({ type: null });
                 window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
                 return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-            }, [interaction, scale, params]);
+            }, [interaction, scale, params.width, params.height, updateLayer]);
+
+            useEffect(() => { updateScale(); window.addEventListener('resize', updateScale); return () => window.removeEventListener('resize', updateScale); }, [updateScale]);
 
             const skinHandlers = { 
                 onDown: handleMouseDown, 
@@ -432,57 +414,53 @@
             const selectedLayer = layers.find(l => l.id === selectedLayerId);
 
             return (
-                <div className={`flex flex-col h-screen overflow-hidden text-slate-800 font-sans selection:bg-indigo-100 ${isDropperActive ? 'dropper-active' : ''}`}>
+                <div className={`flex flex-col h-screen overflow-hidden ${isDropperActive ? 'dropper-active' : ''}`}>
                     <header className="px-6 py-4 bg-white border-b flex justify-between items-center z-40 no-print shadow-sm font-black uppercase">
-                        <div className="flex items-center gap-5">
+                        <div className="flex items-center gap-4">
                             <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-lg"><Icons.Smartphone/></div>
-                            <div>
-                                <h1 className="text-sm leading-none">iP17 Studio <span className="text-indigo-600 italic">PRO AI</span></h1>
-                                <div className="text-[9px] text-slate-400 mt-1.5 tracking-tighter">{params.name} | Editor</div>
-                            </div>
+                            <h1 className="text-sm tracking-tighter">iP17 Studio <span className="text-indigo-600 italic">PRO</span></h1>
                         </div>
-                        <div className="flex gap-3 font-black">
-                            <button onClick={() => { setIsPrintMode(!isPrintMode); setSelectedPrintItemIds([]); setActiveTab('template'); }} className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${isPrintMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border text-slate-600 hover:bg-slate-50'}`}>
-                                {isPrintMode ? <Icons.Smartphone/> : <Icons.Grid3X3/>} {isPrintMode ? 'エディタに戻る' : '印刷レイアウト'}
+                        <div className="flex gap-2">
+                            <button onClick={() => { setIsPrintMode(!isPrintMode); setSelectedPrintItemIds([]); setActiveTab('template'); }} className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${isPrintMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border text-slate-600'}`}>
+                                {isPrintMode ? <Icons.Smartphone/> : <Icons.Grid3X3/>} {isPrintMode ? 'エディタ' : '印刷レイアウト'}
                             </button>
-                            <button onClick={() => { window.focus(); window.print(); }} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-black text-xs active:scale-95 flex items-center gap-2 shadow-lg hover:bg-slate-800 transition-all"><Icons.Printer/> PRINT / PDF保存</button>
+                            <button onClick={() => window.print()} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-black text-xs active:scale-95 shadow-lg"><Icons.Printer/> PRINT</button>
                         </div>
                     </header>
 
                     <div className="flex flex-1 overflow-hidden">
-                        <aside className="w-80 bg-white border-r flex flex-col no-print z-30 shadow-xl overflow-hidden text-[10px] font-bold">
-                            <div className="flex border-b font-black uppercase bg-slate-50/50">
-                                {['template', 'layers', 'design', 'save'].map(tab => (
-                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-4 transition-all ${activeTab === tab ? 'border-b-2 border-indigo-600 text-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}>
-                                        {tab === 'template' ? '設計' : tab === 'layers' ? 'リスト' : tab === 'design' ? '属性' : '保存'}
+                        <aside className="w-80 bg-white border-r flex flex-col no-print z-30 shadow-xl overflow-hidden font-bold">
+                            <div className="flex border-b bg-slate-50/50">
+                                {['template', 'layers', 'design', 'save'].map(t => (
+                                    <button key={t} onClick={() => setActiveTab(t)} className={`flex-1 py-4 text-[10px] uppercase font-black tracking-widest ${activeTab === t ? 'text-indigo-600 border-b-2 border-indigo-600 bg-white' : 'text-slate-400'}`}>
+                                        {t === 'template' ? '設計' : t === 'layers' ? 'リスト' : t === 'design' ? '属性' : '保存'}
                                     </button>
                                 ))}
                             </div>
-                            <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide pb-24 font-black uppercase">
+                            <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide pb-24 font-black">
                                 {activeTab === 'template' && (
-                                    <div className="space-y-6 animate-in slide-in-from-left-4">
+                                    <div className="space-y-6 animate-in slide-in-from-left-4 font-black uppercase">
                                         {!isPrintMode ? (
                                             <>
                                                 <div>
-                                                    <h3 className="text-slate-400 px-1 mb-2 text-[9px] font-black">モデル選択</h3>
-                                                    <div className="grid grid-cols-2 gap-2 mb-4 font-black">
-                                                        {Object.keys(IPHONE_MODELS).map(k => <button key={k} onClick={() => { setSelectedModel(k); setParams(IPHONE_MODELS[k]); }} className={`py-3 rounded-xl border transition-all ${selectedModel === k ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 hover:border-indigo-200'}`}>{IPHONE_MODELS[k].name}</button>)}
+                                                    <h3 className="text-slate-400 px-1 mb-2 text-[9px]">モデル</h3>
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        {Object.keys(IPHONE_MODELS).map(k => <button key={k} onClick={() => { setSelectedModel(k); setParams(IPHONE_MODELS[k]); }} className={`py-2 rounded-lg text-[10px] border transition-all ${selectedModel === k ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 hover:border-indigo-200'}`}>{IPHONE_MODELS[k].name}</button>)}
                                                     </div>
-                                                    <button onClick={addToPaper} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all font-black"><Icons.PlusSquare/> 用紙に追加</button>
                                                 </div>
-                                                <div className="pt-4 border-t space-y-3 font-black">
+                                                <button onClick={addToPaper} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"><Icons.PlusSquare/> 用紙に追加</button>
+                                                <div className="pt-4 border-t space-y-3">
                                                     <label className="flex items-center justify-between p-3 bg-slate-50 border rounded-xl cursor-pointer">
                                                         <div className="flex items-center gap-2 text-slate-600"><Icons.Magnet />MagSafe ガイド</div>
                                                         <input type="checkbox" checked={showMagSafe} onChange={e => setShowMagSafe(e.target.checked)} className="accent-indigo-600 w-4 h-4" />
                                                     </label>
-                                                    {showMagSafe && <ParamItem label="リング幅" val={magSafeWidth} onChange={v => setMagSafeWidth(parseFloat(v) || 0.1)} max={15} />}
                                                 </div>
                                             </>
-                                        ) : <div className="text-center py-20 text-slate-300 italic">レイアウト編集中</div>}
+                                        ) : <div className="text-center py-20 text-slate-300 italic uppercase">Editing Layout</div>}
                                     </div>
                                 )}
                                 {activeTab === 'layers' && (
-                                    <div className="space-y-3">
+                                    <div className="space-y-3 font-black uppercase">
                                         {!isPrintMode ? (
                                             <>
                                                 <button onClick={() => {
@@ -491,56 +469,54 @@
                                                         const nl={id:Date.now(), type:'image', originalSrc:ev.target.result, src:ev.target.result, x:params.width/2, y:params.height/2, w:40, h:40, rotate:0, opacity:1, name:`画像 ${layers.length+1}`, chromaKeyEnabled: false, chromaKeyColor: "#ffffff", chromaKeyTolerance: 50};
                                                         setLayers(p=>[...p, nl]); setSelectedLayerId(nl.id); setActiveTab('design');
                                                     }; r.readAsDataURL(f); }; i.click();
-                                                }} className="w-full py-4 bg-slate-50 border border-dashed rounded-xl font-black flex items-center justify-center gap-2 mb-4 hover:bg-white transition-all text-slate-600 font-black"><Icons.ImageIcon/> 画像を追加</button>
+                                                }} className="w-full py-4 bg-slate-50 border border-dashed rounded-xl font-black flex items-center justify-center gap-2 mb-4 hover:bg-white transition-all text-slate-600 tracking-tighter uppercase font-black"><Icons.ImageIcon/> 画像を追加</button>
                                                 {[...layers].reverse().map(l => (
                                                     <div key={l.id} onClick={() => setSelectedLayerId(l.id)} className={`p-3 rounded-2xl border flex justify-between items-center transition-all ${selectedLayerId === l.id ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-50' : 'bg-white border-slate-100'}`}>
                                                         <span className="truncate w-40 text-slate-700 font-black tracking-tighter leading-none">{l.name}</span>
                                                         <button onClick={e => {e.stopPropagation(); setLayers(p => p.filter(la => la.id !== l.id)); if(selectedLayerId === l.id) setSelectedLayerId(null);}} className="text-slate-300 hover:text-rose-500 transition-all font-black"><Icons.Trash2/></button>
                                                     </div>
                                                 ))}
+                                                {layers.length === 0 && <div className="text-center py-20 text-slate-300 font-black opacity-20 italic">No Layers</div>}
                                             </>
                                         ) : (
                                             printItems.map((item, idx) => (
-                                                <div key={item.id} onClick={() => setSelectedPrintItemIds([item.id])} className={`p-4 rounded-2xl border transition-all ${selectedPrintItemIds.includes(item.id) ? 'bg-indigo-50 border-indigo-300 ring-4 ring-indigo-50' : 'bg-white border-slate-100'}`}>
+                                                <div key={item.id} onClick={() => setSelectedPrintItemIds([item.id])} className={`p-4 rounded-2xl border transition-all cursor-pointer ${selectedPrintItemIds.includes(item.id) ? 'bg-indigo-50 border-indigo-300 ring-4 ring-indigo-50 shadow-inner' : 'bg-white border-slate-100'}`}>
                                                     <div className="font-black text-slate-800 uppercase tracking-tighter leading-none">配置デザイン #{idx + 1}</div>
+                                                    <div className="text-[8px] text-slate-400 mt-2 uppercase font-black">{item.snapshotParams.name}</div>
+                                                    <button onClick={(e) => { e.stopPropagation(); setPrintItems(prev => prev.filter(i => i.id !== item.id)); }} className="mt-2 text-rose-500 text-[8px] uppercase font-black underline">[削除]</button>
                                                 </div>
                                             ))
                                         )}
                                     </div>
                                 )}
                                 {activeTab === 'design' && selectedLayer && (
-                                    <div className="space-y-6 animate-in slide-in-from-right-4">
-                                        <div className="grid grid-cols-2 gap-4 text-center font-black">
+                                    <div className="space-y-6 animate-in slide-in-from-right-4 font-black uppercase">
+                                        <div className="grid grid-cols-2 gap-4 text-center">
                                             <ParamItem label="X位置" val={selectedLayer.x} onChange={v => updateLayer(selectedLayer.id, { x: parseFloat(v) })} />
                                             <ParamItem label="Y位置" val={selectedLayer.y} onChange={v => updateLayer(selectedLayer.id, { y: parseFloat(v) })} />
-                                            <ParamItem label={selectedLayer.type==='image'?"幅":"サイズ"} val={selectedLayer.type==='image'?selectedLayer.w:selectedLayer.fontSize} onChange={v => updateLayer(selectedLayer.id, selectedLayer.type==='image'?{ w: parseFloat(v) }:{ fontSize: parseFloat(v) })} />
+                                            <ParamItem label="幅" val={selectedLayer.w} onChange={v => updateLayer(selectedLayer.id, { w: parseFloat(v) })} />
                                             <ParamItem label="回転" val={selectedLayer.rotate} onChange={v => updateLayer(selectedLayer.id, { rotate: parseFloat(v) })} max={360} />
                                         </div>
-                                        
                                         {selectedLayer.type === 'image' && (
                                             <div className="pt-4 border-t space-y-4">
-                                                <div className="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl shadow-lg">
-                                                    <div className="flex items-center gap-2 font-black italic"><Icons.Dropper/> クロマキー設定</div>
+                                                <div className="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl shadow-lg font-black italic">
+                                                    <div className="flex items-center gap-2 font-black italic uppercase"><Icons.Dropper/> Chroma Key</div>
                                                     <input type="checkbox" checked={selectedLayer.chromaKeyEnabled} onChange={e => updateLayer(selectedLayer.id, { chromaKeyEnabled: e.target.checked })} className="w-4 h-4 accent-indigo-400" />
                                                 </div>
                                                 {selectedLayer.chromaKeyEnabled && (
-                                                    <div className="space-y-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in fade-in">
+                                                    <div className="space-y-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in fade-in font-black uppercase">
                                                         <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
                                                             <div className="flex items-center gap-3">
-                                                                <input type="color" value={selectedLayer.chromaKeyColor} onChange={e => updateLayer(selectedLayer.id, { chromaKeyColor: e.target.value })} className="w-8 h-8 border-0 rounded-lg cursor-pointer shadow-sm" />
+                                                                <input type="color" value={selectedLayer.chromaKeyColor} onChange={e => updateLayer(selectedLayer.id, { chromaKeyColor: e.target.value })} className="w-8 h-8 border-0 rounded-lg cursor-pointer" />
                                                                 <span className="text-[10px] font-black">{selectedLayer.chromaKeyColor}</span>
                                                             </div>
-                                                            <button 
-                                                                onClick={() => { setIsDropperActive(!isDropperActive); if(!isDropperActive) showToast("画像上の色をクリックしてください"); }}
-                                                                className={`p-2 rounded-lg transition-all ${isDropperActive ? 'bg-indigo-600 text-white scale-110 shadow-md' : 'bg-slate-100 text-slate-400'}`}
-                                                            >
+                                                            <button onClick={() => { setIsDropperActive(!isDropperActive); if(!isDropperActive) showToast("画像上の色をクリックしてください"); }} className={`p-2 rounded-lg transition-all ${isDropperActive ? 'bg-indigo-600 text-white scale-110 shadow-md' : 'bg-slate-100 text-slate-400'}`}>
                                                                 <Icons.Dropper/>
                                                             </button>
                                                         </div>
                                                         <ParamItem label="許容範囲" val={selectedLayer.chromaKeyTolerance} onChange={v => updateLayer(selectedLayer.id, { chromaKeyTolerance: parseFloat(v) })} max={200} step={1} unit="level" />
-                                                        
-                                                        <label className="flex items-center justify-between p-2 bg-white rounded-xl border cursor-pointer hover:bg-slate-50 transition-all mt-2">
-                                                            <div className="flex items-center gap-2 font-black text-[9px] uppercase"><Icons.CheckSquare /> 透明部を確認モード</div>
+                                                        <label className="flex items-center justify-between p-2 bg-white rounded-xl border cursor-pointer hover:bg-slate-50 font-black">
+                                                            <div className="flex items-center gap-2 font-black text-[9px]"><Icons.CheckSquare /> 透明部を確認モード</div>
                                                             <input type="checkbox" checked={showChecker} onChange={e => setShowChecker(e.target.checked)} className="accent-indigo-600 w-4 h-4" />
                                                         </label>
                                                     </div>
@@ -550,16 +526,13 @@
                                     </div>
                                 )}
                                 {activeTab === 'save' && (
-                                    <div className="space-y-6 animate-in slide-in-from-left-4 font-black">
+                                    <div className="space-y-6 animate-in slide-in-from-left-4 font-black uppercase">
                                         <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-4 shadow-xl">
-                                            <h3 className="text-indigo-400 flex items-center gap-2 tracking-widest"><Icons.Folder/> ファイル保存 (JSON)</h3>
+                                            <h3 className="text-indigo-400 flex items-center gap-2 tracking-widest"><Icons.Folder/> 保存 (JSON)</h3>
+                                            <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="名前を入力..." className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs outline-none font-black" />
                                             <div className="grid grid-cols-2 gap-2">
-                                                <button onClick={exportToJson} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all">
-                                                    <Icons.Download/> <span className="text-[9px]">書き出し</span>
-                                                </button>
-                                                <button onClick={() => document.getElementById('json-import-trigger').click()} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all">
-                                                    <Icons.Upload/> <span className="text-[9px]">読み込み</span>
-                                                </button>
+                                                <button onClick={exportToJson} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all font-black"><Icons.Download/> 書き出し</button>
+                                                <button onClick={() => document.getElementById('json-import-trigger').click()} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all font-black"><Icons.Upload/> 読み込み</button>
                                                 <input type="file" id="json-import-trigger" accept=".json" onChange={importFromJson} className="hidden" />
                                             </div>
                                         </div>
@@ -568,9 +541,9 @@
                             </div>
                         </aside>
 
-                        <main ref={mainRef} className="flex-1 bg-white flex items-center justify-center overflow-hidden relative p-8 cursor-default" onMouseDown={() => { setSelectedLayerId(null); setSelectedPrintItemIds([]); setContextMenu(null); }}>
-                            <div className={isPrintMode ? "printable-area" : ""}>
-                                <div id="capture-area" className={`transition-all duration-300 relative ${isPrintMode ? '' : 'bg-white shadow-2xl border-[1px] border-slate-100'}`} 
+                        <main ref={mainRef} className="flex-1 bg-slate-200 flex items-center justify-center overflow-hidden relative p-8 cursor-default" onMouseDown={(e) => { setSelectedLayerId(null); setSelectedPrintItemIds([]); setContextMenu(null); }}>
+                            <div className={isPrintMode ? "printable-area" : "paper-shadow"}>
+                                <div id="capture-area" className={`transition-all duration-300 relative bg-white`} 
                                      style={{ 
                                          width: isPrintMode ? '210mm' : (params.width + WORKSPACE_MARGIN * 2) * scale, 
                                          height: isPrintMode ? '297mm' : (params.height + WORKSPACE_MARGIN * 2) * scale 
@@ -584,9 +557,11 @@
                                             <>
                                                 <rect width="210" height="297" fill="white" />
                                                 {printItems.map(item => (
-                                                    <g key={item.id} transform={`translate(${item.x}, ${item.y}) rotate(${item.rotate}, ${params.width/2}, ${params.height/2})`}>
+                                                    <g key={item.id} transform={`translate(${item.x}, ${item.y}) rotate(${item.rotate}, ${params.width/2}, ${params.height/2})`} 
+                                                       onMouseDown={e => { e.stopPropagation(); setSelectedPrintItemIds([item.id]); handleMouseDown(e, 'move_print', item.id); }}>
                                                         <rect width={params.width} height={params.height} fill="none" stroke="#e2e8f0" strokeWidth="0.1" strokeDasharray="1,1" className="no-print" />
-                                                        <Skin p={item.snapshotParams} ls={item.snapshotLayers} uniqueId={item.id} interactive={false} magsafe={item.snapshotParams.showMagSafe} mWidth={5} handlers={{}} selectedLayerId={null} scale={1} showChecker={false} />
+                                                        <Skin p={item.snapshotParams} ls={item.snapshotLayers} uniqueId={item.id} interactive={false} magsafe={false} mWidth={5} handlers={{}} selectedLayerId={null} scale={1} showChecker={false} />
+                                                        {selectedPrintItemIds.includes(item.id) && <rect x="-1" y="-1" width={params.width+2} height={params.height+2} fill="none" stroke="#6366f1" strokeWidth="0.5" strokeDasharray="3,3" className="no-print" />}
                                                     </g>
                                                 ))}
                                             </>
@@ -611,7 +586,7 @@
                             <button onClick={() => { deleteActiveSelection(); setContextMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-rose-50 text-rose-500 flex items-center gap-3 transition-colors font-black italic font-black font-black uppercase font-black font-black uppercase font-black font-black uppercase"><Icons.Trash2 /> 選択を削除</button>
                         </div>
                     )}
-                    {toast && <div className="toast">{toast}</div>}
+                    {toast && <div className="toast font-black uppercase tracking-tighter">{toast}</div>}
                 </div>
             );
         };
