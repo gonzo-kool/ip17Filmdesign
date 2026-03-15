@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="robots" content="noindex, nofollow">
+    <title>iP17 Design & Print Studio PRO AI</title>
+    <!-- Dependencies -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
+    
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.FirebaseSDK = { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot, query };
+    </script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; overflow: hidden; background: #f8fafc; }
+        @media print {
+            body * { visibility: hidden; }
+            .printable-area, .printable-area * { visibility: visible; }
+            .printable-area { position: absolute; left: 0; top: 0; width: 210mm; height: 297mm; background: white !important; }
+            header, aside, .hud-ui, .no-print, .context-menu { display: none !important; }
+        }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 14px;
+            height: 14px;
+            background: #4f46e5;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .context-menu {
+            position: fixed;
+            background: white;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+            border-radius: 12px;
+            padding: 8px;
+            z-index: 1000;
+            min-width: 180px;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #6366f1;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1e293b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3);
+            z-index: 2000;
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect, useCallback } = React;
+
+        // --- Icons ---
+        const Icons = {
+            Smartphone: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg>,
+            Settings: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/></svg>,
+            Layers: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+            AlignCenter: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="21" x2="3" y1="6" y2="6"/><line x1="15" x2="9" y1="12" y2="12"/><line x1="17" x2="7" y1="18" y2="18"/></svg>,
+            Save: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
+            Printer: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
+            PlusSquare: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="12" x2="12" y1="8" y2="16"/><line x1="8" x2="16" y1="12" y2="12"/></svg>,
+            Trash2: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
+            Type: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" x2="15" y1="20" y2="20"/><line x1="12" x2="12" y1="4" y2="20"/></svg>,
+            ImageIcon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>,
+            Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
+            Grid3X3: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="3" y2="21"/><line x1="15" x2="15" y1="3" y2="21"/></svg>,
+            AlignLeft: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 2v20"/><path d="M20 6H8"/><path d="M16 12H8"/><path d="M18 18H8"/></svg>,
+            AlignRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M20 2v20"/><path d="M4 6h12"/><path d="M8 12h12"/><path d="M6 18h12"/></svg>,
+            AlignTop: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M2 4h20"/><path d="M6 20V8"/><path d="M12 16V8"/><path d="M18 18V8"/></svg>,
+            AlignBottom: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M2 20h20"/><path d="M6 4v12"/><path d="M12 8v12"/><path d="M18 6v12"/></svg>,
+            AlignCenterH: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 2v20"/><path d="M20 12H4"/><path d="M17 7H7"/><path d="M17 17H7"/></svg>,
+            AlignCenterV: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M2 12h20"/><path d="M12 20V4"/><path d="M7 17V7"/><path d="M17 17V7"/></svg>,
+            DistributeH: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="6" height="14" x="2" y="5" rx="1"/><rect width="6" height="14" x="16" y="5" rx="1"/><path d="M12 2v20"/></svg>,
+            DistributeV: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="14" height="6" x="5" y="2" rx="1"/><rect width="14" height="6" x="5" y="16" rx="1"/><path d="M2 12h20"/></svg>,
+            ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
+            ChevronDown: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>,
+            Magnet: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m6 15-4-4 6.7-6.7c.9-.9 2.3-.9 3.2 0l4.2 4.2c.9.9.9 2.3 0 3.2L9.4 18.4A4.48 4.48 0 0 1 6.3 19.7c-1.3 0-2.5-.5-3.5-1.5L6 15Z"/><path d="m9 18-4-4"/><path d="m17 13 4-4"/><path d="m15 10 4-4"/></svg>,
+            Sparkles: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
+            Folder: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>,
+        };
+
+        const IPHONE_MODELS = {
+            standard: { id: 'standard', name: 'iPhone 17', width: 71.5, height: 149.6, cornerRadius: 12, cameraType: 'pill-vertical', cameraBox: { w: 20.0, h: 39.0, x: 2.6, y: 2.6, r: 10.0 }, flash: { x: 27.4, y: 22.1, r: 3.1 }, logoY: 74.8, magsafeY: 74.8 },
+            pro: { id: 'pro', name: 'iPhone 17 Pro', width: 71.9, height: 150.0, cornerRadius: 12, cameraType: 'plateau-pro', cameraBox: { w: 42, h: 44, x: 4.5, y: 4.5, r: 8 }, flash: { x: 36.0, y: 36.0, r: 2.8 }, logoY: 75.0, magsafeY: 75.0 },
+            proMax: { id: 'proMax', name: 'iPhone 17 Pro Max', width: 78.0, height: 163.4, cornerRadius: 14, cameraType: 'plateau-pro', cameraBox: { w: 46, h: 48, x: 5, y: 5, r: 9 }, flash: { x: 40.0, y: 40.0, r: 3.0 }, logoY: 81.7, magsafeY: 81.7 },
+            air: { id: 'air', name: 'iPhone 17 Air', width: 77.6, height: 163.0, cornerRadius: 15, cameraType: 'horizontal-visor', cameraBox: { w: 64, h: 22, x: 6.8, y: 14, r: 11 }, logoY: 88.0, magsafeY: 88.0 }
+        };
+
+        const A4_WIDTH = 210, A4_HEIGHT = 297, WORKSPACE_MARGIN = 30, SVG_PADDING = 1;
+        const apiKey = ""; 
+
+        // --- Firebase Setup ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const { initializeApp, getAuth, signInAnonymously, onAuthStateChanged, getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } = window.FirebaseSDK;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+        // --- Shared Components ---
+        const ParamItem = ({ label, val, onChange, max = 100 }) => (
+            <div className="space-y-1.5 group text-[10px]">
+                <div className="flex justify-between items-center font-bold uppercase text-slate-500 tracking-tighter">
+                    <span>{label}</span>
+                    <input type="number" step="0.1" value={val} onChange={e => onChange(e.target.value)} className="w-14 bg-slate-50 border rounded-xl text-right px-2 py-1 font-mono text-indigo-600 outline-none focus:bg-white" />
+                </div>
+                <input type="range" min="0" max={max} step="0.1" value={val} onChange={e => onChange(e.target.value)} className="w-full accent-indigo-600 h-1 bg-slate-100 rounded-lg appearance-none cursor-pointer" />
+            </div>
+        );
+
+        const Skin = ({ p, ls, uniqueId, interactive, magsafe, mWidth, handlers, selectedLayerId, scale }) => {
+            const clipId = `body-clip-${uniqueId}`, maskId = `cam-mask-${uniqueId}`, sw = 0.3;
+            return (
+                <g>
+                    <defs>
+                        <clipPath id={clipId}><rect width={p.width} height={p.height} rx={p.cornerRadius} /></clipPath>
+                        <mask id={maskId}><rect width={p.width} height={p.height} fill="white" /><g fill="black"><rect x={p.cameraBox.x} y={p.cameraBox.y} width={p.cameraBox.w} height={p.cameraBox.h} rx={p.cameraBox.r} /><circle cx={p.flash?.x || 0} cy={p.flash?.y || 0} r={p.flash?.r || 0} /></g></mask>
+                    </defs>
+                    <g clipPath={`url(#${clipId})`} mask={`url(#${maskId})`}>
+                        {ls.map(l => (
+                            <g key={`content-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} onContextMenu={(e) => handlers.onCtx && handlers.onCtx(e, l.id)} onClick={(e) => e.stopPropagation()}>
+                                {l.type === 'image' ? (
+                                    <image href={l.src} x={l.x - l.w/2} y={l.y - l.h/2} width={l.w} height={l.h} opacity={l.opacity} style={{ cursor: interactive ? 'move' : 'default' }} onMouseDown={(e) => interactive && handlers.onDown(e, 'move', l.id)} />
+                                ) : (
+                                    <text x={l.x} y={l.y} fontSize={l.fontSize} fill={l.color} textAnchor="middle" dominantBaseline="middle" opacity={l.opacity} style={{ paintOrder: 'stroke fill', fontWeight: l.fontWeight, userSelect: 'none', cursor: interactive ? 'move' : 'default' }} onMouseDown={(e) => interactive && handlers.onDown(e, 'move', l.id)}>{l.text}</text>
+                                )}
+                            </g>
+                        ))}
+                    </g>
+                    {magsafe && (
+                        <g id="magsafe-guide" opacity="0.15" pointerEvents="none">
+                            <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth={mWidth} strokeOpacity="0.6" />
+                            <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth="0.2" strokeDasharray="1,1" />
+                            <rect x={p.width/2 - 2.5} y={p.magsafeY + 31} width="5" height="11" rx="2.5" fill="#000" fillOpacity="0.5" />
+                        </g>
+                    )}
+                    <rect x={sw/2} y={sw/2} width={p.width - sw} height={p.height - sw} rx={p.cornerRadius - sw/2} fill="none" stroke="#334155" strokeWidth={sw} pointerEvents="none" />
+                    <rect x={p.cameraBox.x} y={p.cameraBox.y} width={p.cameraBox.w} height={p.cameraBox.h} rx={p.cameraBox.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />
+                    {p.flash && <circle cx={p.flash.x} cy={p.flash.y} r={p.flash.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />}
+                    {interactive && ls.map(l => {
+                        if (selectedLayerId !== l.id) return null;
+                        const h_w = l.type === 'image' ? l.w : l.fontSize * 4, h_h = l.type === 'image' ? l.h : l.fontSize;
+                        return (
+                            <g key={`handle-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} pointerEvents="none">
+                                <g transform={`translate(${l.x}, ${l.y})`}>
+                                    <rect x={-h_w/2} y={-h_h/2} width={h_w} height={h_h} fill="none" stroke="#6366f1" strokeWidth={1.5/scale} strokeDasharray="2,2" />
+                                    <circle cx={h_w/2} cy={h_h/2} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'nwse-resize', pointerEvents: 'all' }} onMouseDown={(e) => handlers.onDown(e, 'resize', l.id)} />
+                                    <line x1="0" y1={-h_h/2} x2="0" y2={-h_h/2 - 25/scale} stroke="#6366f1" strokeWidth={2/scale} />
+                                    <circle cx="0" cy={-h_h/2 - 25/scale} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'alias', pointerEvents: 'all' }} onMouseDown={(e) => handlers.onDown(e, 'rotate', l.id)} />
+                                </g>
+                            </g>
+                        );
+                    })}
+                </g>
+            );
+        };
+
+        const App = () => {
+            const [user, setUser] = useState(null);
+            const [projects, setProjects] = useState([]);
+            const [selectedModel, setSelectedModel] = useState('standard');
+            const [params, setParams] = useState(IPHONE_MODELS.standard);
+            const [layers, setLayers] = useState([]);
+            const [selectedLayerId, setSelectedLayerId] = useState(null);
+            const [showMagSafe, setShowMagSafe] = useState(false);
+            const [magSafeWidth, setMagSafeWidth] = useState(5.0);
+            const [isPrintMode, setIsPrintMode] = useState(false);
+            const [printItems, setPrintItems] = useState([]);
+            const [selectedPrintItemIds, setSelectedPrintItemIds] = useState([]);
+            const [activeTab, setActiveTab] = useState('template');
+            const [clipboard, setClipboard] = useState(null);
+            const [contextMenu, setContextMenu] = useState(null);
+            const [scale, setScale] = useState(3.5);
+            const [showAdvanced, setShowAdvanced] = useState(false);
+            const [aiPrompt, setAiPrompt] = useState("");
+            const [isGenerating, setIsGenerating] = useState(false);
+            const [projectName, setProjectName] = useState("");
+            const [toast, setToast] = useState(null);
+
+            const mainRef = useRef(null);
+            const svgContainerRef = useRef(null);
+            const imageUploadRef = useRef(null);
+            const [interaction, setInteraction] = useState({ type: null, startX: 0, startY: 0, initialLayer: null, initialItems: [] });
+
+            // --- Auth & Data Fetching ---
+            useEffect(() => {
+                const initAuth = async () => { await signInAnonymously(auth); };
+                initAuth();
+                const unsubscribe = onAuthStateChanged(auth, setUser);
+                return () => unsubscribe();
+            }, []);
+
+            useEffect(() => {
+                if (!user) return;
+                const q = collection(db, 'artifacts', appId, 'users', user.uid, 'projects');
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    setProjects(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                });
+                return () => unsubscribe();
+            }, [user]);
+
+            const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+
+            const saveProject = async () => {
+                if (!user) return;
+                const name = projectName || `PROJECT-${Date.now()}`;
+                const data = { name, params, layers, printItems, showMagSafe, magSafeWidth, selectedModel, updatedAt: Date.now() };
+                try {
+                    await setDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', name), data);
+                    showToast("保存完了");
+                } catch (e) { showToast("保存失敗"); }
+            };
+
+            const loadProject = (proj) => {
+                setProjectName(proj.name);
+                setSelectedModel(proj.selectedModel || 'standard');
+                setParams(proj.params);
+                setLayers(proj.layers);
+                setPrintItems(proj.printItems || []);
+                setShowMagSafe(proj.showMagSafe || false);
+                setMagSafeWidth(proj.magSafeWidth || 5.0);
+                setActiveTab('template');
+                showToast("ロード完了");
+            };
+
+            // --- Handlers ---
+            const handlePrint = useCallback(() => { window.focus(); window.print(); }, []);
+
+            const handleMouseDown = useCallback((e, type, layerId) => {
+                e.stopPropagation(); setContextMenu(null);
+                const layer = layers.find(l => l.id === layerId);
+                if (!layer) return;
+                setSelectedLayerId(layerId);
+                setInteraction({ type, startX: e.clientX, startY: e.clientY, initialLayer: { ...layer } });
+            }, [layers]);
+
+            const handleContextMenu = useCallback((e, layerId) => {
+                if (isPrintMode) return;
+                e.preventDefault(); e.stopPropagation();
+                setSelectedLayerId(layerId);
+                setContextMenu({ x: e.clientX, y: e.clientY, layerId });
+            }, [isPrintMode]);
+
+            const deleteActiveSelection = useCallback(() => {
+                if (isPrintMode) {
+                    setPrintItems(prev => prev.filter(i => !selectedPrintItemIds.includes(i.id)));
+                    setSelectedPrintItemIds([]);
+                } else if (selectedLayerId) {
+                    setLayers(prev => prev.filter(l => l.id !== selectedLayerId));
+                    setSelectedLayerId(null);
+                }
+            }, [isPrintMode, selectedPrintItemIds, selectedLayerId]);
+
+            const duplicateLayer = useCallback((id) => {
+                const layer = layers.find(l => l.id === id);
+                if (!layer) return;
+                const nl = { ...layer, id: Date.now(), x: layer.x + 5, y: layer.y + 5, name: `${layer.name} (コピー)` };
+                setLayers(prev => [...prev, nl]); setSelectedLayerId(nl.id);
+            }, [layers]);
+
+            const addToPaper = useCallback(() => {
+                const newItem = {
+                    id: "print-" + Date.now() + Math.random(),
+                    x: 10 + (printItems.length * 5), y: 10 + (printItems.length * 5),
+                    rotate: 0, snapshotLayers: JSON.parse(JSON.stringify(layers)),
+                    snapshotParams: {...params, showMagSafe, magSafeWidth}
+                };
+                setPrintItems(prev => [...prev, newItem]);
+                setSelectedPrintItemIds([newItem.id]);
+                setIsPrintMode(true);
+                setActiveTab('layers'); 
+            }, [layers, params, printItems.length, showMagSafe, magSafeWidth]);
+
+            const generateAIImage = async () => {
+                if (!aiPrompt) return;
+                setIsGenerating(true);
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${apiKey}`;
+                const optPrompt = `${aiPrompt}, vertical design for smartphone skin, 9:19 aspect ratio, seamless art pattern, high quality details`;
+                const payload = { instances: { prompt: optPrompt }, parameters: { sampleCount: 1 } };
+                const callAPI = async (retryCount = 0) => {
+                    try {
+                        const response = await fetch(url, { method: "POST", body: JSON.stringify(payload) });
+                        if (!response.ok) throw new Error();
+                        const result = await response.json();
+                        const dataUrl = `data:image/png;base64,${result.predictions[0].bytesBase64Encoded}`;
+                        const nl = { id: Date.now(), type: 'image', src: dataUrl, x: params.width / 2, y: params.height / 2, w: params.width, h: params.height, rotate: 0, opacity: 1, name: `AI: ${aiPrompt.slice(0, 10)}...` };
+                        setLayers(p => [...p, nl]); setSelectedLayerId(nl.id); setActiveTab('design'); setIsGenerating(false);
+                    } catch (err) {
+                        if (retryCount < 5) setTimeout(() => callAPI(retryCount + 1), Math.pow(2, retryCount) * 1000);
+                        else { showToast("生成失敗"); setIsGenerating(false); }
+                    }
+                };
+                callAPI();
+            };
+
+            const handleParamChange = useCallback((cat, key, val) => {
+                const num = val === "" ? 0 : parseFloat(val);
+                if (cat) setParams(p => ({ ...p, [cat]: { ...p[cat], [key]: num } }));
+                else setParams(p => ({ ...p, [key]: num }));
+            }, []);
+
+            const alignPrintItems = useCallback((direction) => {
+                if (selectedPrintItemIds.length < 1) return;
+                const itemsToAlign = printItems.filter(i => selectedPrintItemIds.includes(i.id));
+                let minX = Math.min(...itemsToAlign.map(i => i.x)), maxX = Math.max(...itemsToAlign.map(i => i.x + i.snapshotParams.width));
+                let minY = Math.min(...itemsToAlign.map(i => i.y)), maxY = Math.max(...itemsToAlign.map(i => i.y + i.snapshotParams.height));
+
+                setPrintItems(prev => {
+                    if ((direction === 'dist-h' || direction === 'dist-v') && selectedPrintItemIds.length > 2) {
+                        const axis = direction === 'dist-h' ? 'x' : 'y';
+                        const sizeAttr = direction === 'dist-h' ? 'width' : 'height';
+                        const sorted = [...itemsToAlign].sort((a, b) => a[axis] - b[axis]);
+                        const totalRange = (direction === 'dist-h' ? maxX : maxY) - (direction === 'dist-h' ? minX : minY);
+                        const itemsSizeSum = sorted.reduce((sum, i) => sum + i.snapshotParams[sizeAttr], 0);
+                        const gap = (totalRange - itemsSizeSum) / (sorted.length - 1);
+                        let currentPos = direction === 'dist-h' ? minX : minY;
+                        const newPos = {};
+                        sorted.forEach(item => { newPos[item.id] = currentPos; currentPos += item.snapshotParams[sizeAttr] + gap; });
+                        return prev.map(item => newPos[item.id] !== undefined ? { ...item, [axis]: newPos[item.id] } : item);
+                    }
+                    return prev.map(item => {
+                        if (!selectedPrintItemIds.includes(item.id)) return item;
+                        switch(direction) {
+                            case 'left': return { ...item, x: minX };
+                            case 'right': return { ...item, x: maxX - item.snapshotParams.width };
+                            case 'h-center': return { ...item, x: (minX + maxX) / 2 - item.snapshotParams.width / 2 };
+                            case 'top': return { ...item, y: minY };
+                            case 'bottom': return { ...item, y: maxY - item.snapshotParams.height };
+                            case 'v-center': return { ...item, y: (minY + maxY) / 2 - item.snapshotParams.height / 2 };
+                            default: return item;
+                        }
+                    });
+                });
+            }, [printItems, selectedPrintItemIds]);
+
+            // --- Lifecycle ---
+            const updateScale = useCallback(() => {
+                if (!mainRef.current) return;
+                const { offsetWidth, offsetHeight } = mainRef.current;
+                const targetW = isPrintMode ? A4_WIDTH : params.width + (WORKSPACE_MARGIN * 2);
+                const targetH = isPrintMode ? A4_HEIGHT : params.height + (WORKSPACE_MARGIN * 2);
+                setScale(Math.max(0.5, Math.min((offsetWidth - 60) / targetW, (offsetHeight - 60) / targetH, 8.0)));
+            }, [isPrintMode, params.width, params.height]);
+
+            useEffect(() => { updateScale(); }, [updateScale]);
+            useEffect(() => {
+                const observer = new ResizeObserver(updateScale);
+                if (mainRef.current) observer.observe(mainRef.current);
+                return () => observer.disconnect();
+            }, [updateScale]);
+
+            useEffect(() => {
+                const handleMouseMove = (e) => {
+                    if (!interaction.type) return;
+                    const dx = (e.clientX - interaction.startX) / scale, dy = (e.clientY - interaction.startY) / scale;
+                    if (interaction.type === 'move_print') {
+                        setPrintItems(prev => prev.map(item => {
+                            const init = interaction.initialItems.find(ii => ii.id === item.id);
+                            return init ? { ...item, x: init.x + dx, y: init.y + dy } : item;
+                        }));
+                    } else if (interaction.type === 'move') {
+                        setLayers(prev => prev.map(l => l.id === interaction.initialLayer.id ? { ...l, x: interaction.initialLayer.x + dx, y: interaction.initialLayer.y + dy } : l));
+                    } else if (interaction.type === 'rotate') {
+                        const rect = svgContainerRef.current.getBoundingClientRect();
+                        const cx = rect.left + ((interaction.initialLayer.x + WORKSPACE_MARGIN) * scale), cy = rect.top + ((interaction.initialLayer.y + WORKSPACE_MARGIN) * scale);
+                        let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) + 90;
+                        if (e.ctrlKey) angle = Math.round(angle / 22.5) * 22.5;
+                        setLayers(prev => prev.map(l => l.id === interaction.initialLayer.id ? { ...l, rotate: Math.round(angle) } : l));
+                    } else if (interaction.type === 'resize') {
+                        const updates = interaction.initialLayer.type === 'image' ? { w: Math.max(2, interaction.initialLayer.w + dx), h: Math.max(2, interaction.initialLayer.h + dx) } : { fontSize: Math.max(1, interaction.initialLayer.fontSize + dx * 0.5) };
+                        setLayers(prev => prev.map(l => l.id === interaction.initialLayer.id ? { ...l, ...updates } : l));
+                    }
+                };
+                const handleMouseUp = () => setInteraction({ type: null });
+                window.addEventListener('mousemove', handleMouseMove); window.addEventListener('mouseup', handleMouseUp);
+                return () => { window.removeEventListener('mousemove', handleMouseMove); window.removeEventListener('mouseup', handleMouseUp); };
+            }, [interaction, scale]);
+
+            useEffect(() => {
+                const handleKeyDown = (e) => {
+                    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') return;
+                    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteActiveSelection(); }
+                };
+                window.addEventListener('keydown', handleKeyDown);
+                return () => window.removeEventListener('keydown', handleKeyDown);
+            }, [deleteActiveSelection]);
+
+            const skinHandlers = { onDown: handleMouseDown, onCtx: handleContextMenu };
+
+            return (
+                <div className="flex flex-col h-screen overflow-hidden text-slate-800 font-sans selection:bg-indigo-100">
+                    <header className="px-6 py-4 bg-white border-b flex justify-between items-center z-40 no-print shadow-sm">
+                        <div className="flex items-center gap-5">
+                            <div className="bg-indigo-600 text-white p-2 rounded-xl"><Icons.Smartphone/></div>
+                            <div>
+                                <h1 className="text-sm font-black uppercase text-slate-900 leading-none tracking-tight">iP17 Studio <span className="text-indigo-600 italic">PRO AI</span></h1>
+                                <div className="text-[9px] font-bold text-slate-400 mt-1.5 uppercase tracking-widest">{params.name} | {isPrintMode ? "A4 Paper" : "Editor"}</div>
+                            </div>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => { setIsPrintMode(!isPrintMode); setSelectedPrintItemIds([]); setActiveTab('template'); }} className={`px-5 py-2 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${isPrintMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border text-slate-600'}`}>
+                                {isPrintMode ? <Icons.Smartphone/> : <Icons.Grid3X3/>} {isPrintMode ? 'エディタに戻る' : '印刷レイアウト'}
+                            </button>
+                            <button onClick={handlePrint} className="bg-slate-900 text-white px-5 py-2 rounded-xl font-black text-xs active:scale-95 flex items-center gap-2 shadow-lg hover:bg-slate-800"><Icons.Printer/> PRINT / PDF保存</button>
+                        </div>
+                    </header>
+
+                    <div className="flex flex-1 overflow-hidden">
+                        <aside className="w-80 bg-white border-r flex flex-col no-print z-30 shadow-xl overflow-hidden text-[10px]">
+                            <div className="flex border-b font-black uppercase bg-slate-50/50">
+                                {['template', 'ai', 'layers', 'design', 'save'].map(tab => (
+                                    <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 py-4 transition-all ${activeTab === tab ? 'border-b-2 border-indigo-600 text-indigo-600 bg-white' : 'text-slate-400 hover:text-slate-600'}`}>
+                                        {tab === 'template' ? '設計' : tab === 'ai' ? 'AI' : tab === 'layers' ? 'リスト' : tab === 'design' ? '属性' : '保存'}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide pb-24 font-bold">
+                                {activeTab === 'template' && (
+                                    <div className="space-y-6 animate-in slide-in-from-left-4">
+                                        {!isPrintMode ? (
+                                            <>
+                                                <div>
+                                                    <h3 className="text-slate-400 uppercase tracking-widest px-1 mb-2">モデル選択</h3>
+                                                    <div className="grid grid-cols-2 gap-2 mb-4">
+                                                        {Object.keys(IPHONE_MODELS).map(k => <button key={k} onClick={() => { setSelectedModel(k); setParams(IPHONE_MODELS[k]); }} className={`py-3 rounded-xl border transition-all ${selectedModel === k ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white border-slate-200 text-slate-500'}`}>{IPHONE_MODELS[k].name}</button>)}
+                                                    </div>
+                                                    <button onClick={addToPaper} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"><Icons.PlusSquare/> 用紙に追加</button>
+                                                </div>
+                                                <div className="pt-4 border-t space-y-3">
+                                                    <label className="flex items-center justify-between p-3 bg-slate-50 border rounded-xl cursor-pointer">
+                                                        <div className="flex items-center gap-2 font-black uppercase text-slate-600"><Icons.Magnet />MagSafe ガイド</div>
+                                                        <input type="checkbox" checked={showMagSafe} onChange={e => setShowMagSafe(e.target.checked)} className="accent-indigo-600 w-4 h-4" />
+                                                    </label>
+                                                    {showMagSafe && <ParamItem label="リング幅" val={magSafeWidth} onChange={v => setMagSafeWidth(parseFloat(v) || 0.1)} max={15} />}
+                                                    <button onClick={() => setShowAdvanced(!showAdvanced)} className="w-full flex items-center justify-between p-3 bg-slate-50 border rounded-xl font-black uppercase text-slate-500 hover:bg-slate-100 transition-all">
+                                                        <span>詳細設計設定を表示</span>{showAdvanced ? <Icons.ChevronDown/> : <Icons.ChevronRight/>}
+                                                    </button>
+                                                    {showAdvanced && (
+                                                        <div className="space-y-6 p-4 bg-white border border-slate-100 rounded-2xl shadow-inner animate-in fade-in slide-in-from-top-2">
+                                                            <div className="space-y-4">
+                                                                <h4 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b pb-1">カメラユニット</h4>
+                                                                <ParamItem label="カメ幅(W)" val={params.cameraBox.w} onChange={v => handleParamChange('cameraBox', 'w', v)} />
+                                                                <ParamItem label="カメ高(H)" val={params.cameraBox.h} onChange={v => handleParamChange('cameraBox', 'h', v)} />
+                                                                <ParamItem label="カメ横位置(X)" val={params.cameraBox.x} onChange={v => handleParamChange('cameraBox', 'x', v)} />
+                                                                <ParamItem label="カメ縦位置(Y)" val={params.cameraBox.y} onChange={v => handleParamChange('cameraBox', 'y', v)} />
+                                                                <ParamItem label="カメ角丸(R)" val={params.cameraBox.r} onChange={v => handleParamChange('cameraBox', 'r', v)} />
+                                                            </div>
+                                                            <div className="space-y-4 pt-4 border-t">
+                                                                <h4 className="text-[9px] font-black text-indigo-400 uppercase tracking-widest border-b pb-1">フラッシュ</h4>
+                                                                <ParamItem label="フラ横位置(X)" val={params.flash?.x || 0} onChange={v => handleParamChange('flash', 'x', v)} />
+                                                                <ParamItem label="フラ縦位置(Y)" val={params.flash?.y || 0} onChange={v => handleParamChange('flash', 'y', v)} />
+                                                                <ParamItem label="フラ半径(R)" val={params.flash?.r || 0} onChange={v => handleParamChange('flash', 'r', v)} />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                <h3 className="text-slate-400 uppercase tracking-widest px-1">整列ツール</h3>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <button onClick={() => alignPrintItems('left')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignLeft/> 左揃え</button>
+                                                    <button onClick={() => alignPrintItems('h-center')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignCenterH/> 水平中央</button>
+                                                    <button onClick={() => alignPrintItems('right')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignRight/> 右揃え</button>
+                                                    <button onClick={() => alignPrintItems('top')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignTop/> 上揃え</button>
+                                                    <button onClick={() => alignPrintItems('v-center')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignCenterV/> 垂直中央</button>
+                                                    <button onClick={() => alignPrintItems('bottom')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.AlignBottom/> 下揃え</button>
+                                                    <button onClick={() => alignPrintItems('dist-h')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.DistributeH/> 左右均等</button>
+                                                    <button onClick={() => alignPrintItems('dist-v')} className="p-2.5 bg-slate-50 border rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-50 hover:text-indigo-600 transition-all"><Icons.DistributeV/> 上下均等</button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {activeTab === 'ai' && (
+                                    <div className="space-y-4 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                                        <h3 className="text-indigo-600 uppercase flex items-center gap-2"><Icons.Sparkles/> AI生成</h3>
+                                        <textarea value={aiPrompt} onChange={e => setAiPrompt(e.target.value)} placeholder="デザイン指示..." className="w-full px-4 py-3 bg-white border border-indigo-200 rounded-xl text-xs min-h-[120px] outline-none shadow-inner" />
+                                        <button onClick={generateAIImage} disabled={isGenerating || !aiPrompt} className="w-full py-4 bg-indigo-600 text-white rounded-xl font-black shadow-lg flex items-center justify-center gap-3 disabled:opacity-50 transition-all active:scale-95">
+                                            {isGenerating ? <div className="loader"></div> : <Icons.Sparkles/>} {isGenerating ? "生成中..." : "生成する"}
+                                        </button>
+                                    </div>
+                                )}
+                                {activeTab === 'layers' && (
+                                    <div className="space-y-3">
+                                        {!isPrintMode ? (
+                                            <>
+                                                <button onClick={() => imageUploadRef.current.click()} className="w-full py-4 bg-slate-50 border border-dashed rounded-xl font-black flex items-center justify-center gap-2 mb-4 hover:bg-white transition-all"><Icons.ImageIcon/> 画像を追加</button>
+                                                <input type="file" ref={imageUploadRef} onChange={e => {
+                                                    const file = e.target.files[0]; if (!file) return;
+                                                    const reader = new FileReader(); reader.onload = ev => {
+                                                        const nl = { id: Date.now(), type: 'image', src: ev.target.result, x: params.width/2, y: params.height/2, w: params.width, h: params.height, rotate: 0, opacity: 1, name: `画像 ${layers.length+1}` };
+                                                        setLayers(p => [...p, nl]); setSelectedLayerId(nl.id); setActiveTab('design');
+                                                    }; reader.readAsDataURL(file);
+                                                }} className="hidden" accept="image/*" />
+                                                {[...layers].reverse().map(l => (
+                                                    <div key={l.id} onClick={() => setSelectedLayerId(l.id)} className={`p-3 rounded-2xl border flex justify-between items-center transition-all ${selectedLayerId === l.id ? 'bg-indigo-50 border-indigo-300' : 'bg-white'}`}>
+                                                        <span className="truncate w-40 leading-none">{l.name}</span>
+                                                        <button onClick={e => {e.stopPropagation(); deleteLayer(l.id);}} className="text-slate-300 hover:text-rose-500"><Icons.Trash2/></button>
+                                                    </div>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            printItems.map((item, idx) => (
+                                                <div key={item.id} onClick={() => setSelectedPrintItemIds([item.id])} className={`p-4 rounded-2xl border transition-all ${selectedPrintItemIds.includes(item.id) ? 'bg-indigo-50 border-indigo-300' : 'bg-white'}`}>
+                                                    <div className="font-black leading-none">配置 #{idx+1} ({item.snapshotParams.name})</div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                )}
+                                {activeTab === 'design' && (
+                                    <div className="space-y-6">
+                                        {(isPrintMode ? selectedPrintItemIds.length > 0 : selectedLayerId) ? (
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {['x', 'y', 'rotate'].map(k => (
+                                                    <div key={k} className="space-y-1.5">
+                                                        <div className="text-slate-400 uppercase">{k}位置</div>
+                                                        <input type="number" step="1" 
+                                                            value={isPrintMode ? (printItems.find(i => i.id === selectedPrintItemIds[0])?.[k] || 0) : (layers.find(l => l.id === selectedLayerId)?.[k] || 0)} 
+                                                            onChange={e => {
+                                                                const v = parseFloat(e.target.value) || 0;
+                                                                if (isPrintMode) setPrintItems(p => p.map(i => selectedPrintItemIds.includes(i.id) ? { ...i, [k]: v } : i));
+                                                                else setLayers(p => p.map(l => l.id === selectedLayerId ? { ...l, [k]: v } : l));
+                                                            }} 
+                                                            className="w-full px-4 py-3 bg-slate-50 border rounded-2xl font-mono text-indigo-600 focus:bg-white outline-none transition-all" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : ( <div className="text-center py-20 text-slate-300 italic uppercase">No Selection</div> )}
+                                    </div>
+                                )}
+                                {activeTab === 'save' && (
+                                    <div className="space-y-6 animate-in slide-in-from-left-4">
+                                        <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl space-y-4">
+                                            <h3 className="text-indigo-600 uppercase flex items-center gap-2 font-black uppercase"><Icons.Save/> プロジェクト保存</h3>
+                                            <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="名前を付けて保存..." className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-xs outline-none" />
+                                            <button onClick={saveProject} disabled={!projectName} className="w-full py-3 bg-indigo-600 text-white rounded-xl font-black shadow hover:bg-indigo-700 transition-all disabled:opacity-50">クラウドに保存</button>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <h3 className="text-slate-400 uppercase tracking-widest px-1">保存済み</h3>
+                                            {projects.map(proj => (
+                                                <div key={proj.id} className="p-3 bg-white border rounded-2xl flex items-center justify-between hover:border-indigo-200 cursor-pointer shadow-sm group">
+                                                    <div className="flex-1" onClick={() => loadProject(proj)}>
+                                                        <div className="text-[11px] font-black group-hover:text-indigo-600 leading-none">{proj.name}</div>
+                                                        <div className="text-[8px] text-slate-400 mt-1 uppercase leading-none">{new Date(proj.updatedAt).toLocaleString()}</div>
+                                                    </div>
+                                                    <button onClick={() => deleteDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'projects', proj.id))} className="p-2 text-slate-300 hover:text-rose-500"><Icons.Trash2/></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </aside>
+
+                        <main ref={mainRef} className="flex-1 bg-white flex items-center justify-center overflow-hidden relative p-8 cursor-default" onMouseDown={() => { setSelectedLayerId(null); setSelectedPrintItemIds([]); setContextMenu(null); }}>
+                            <div className={isPrintMode ? "printable-area" : ""}>
+                                <div ref={svgContainerRef} 
+                                     className={`transition-all duration-300 relative ${isPrintMode ? 'bg-white shadow-2xl border-[2px] border-white' : ''}`} 
+                                     style={{ 
+                                         width: (isPrintMode ? A4_WIDTH : params.width + (WORKSPACE_MARGIN * 2)) * scale, 
+                                         height: (isPrintMode ? A4_HEIGHT : params.height + (WORKSPACE_MARGIN * 2)) * scale 
+                                     }}>
+                                    <svg viewBox={`0 0 ${isPrintMode ? A4_WIDTH : params.width + (WORKSPACE_MARGIN * 2)} ${isPrintMode ? A4_HEIGHT : params.height + (WORKSPACE_MARGIN * 2)}`} width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                                        {isPrintMode ? (
+                                            <>
+                                                <rect width={A4_WIDTH} height={A4_HEIGHT} fill="white" />
+                                                {printItems.map(item => (
+                                                    <g key={item.id} transform={`translate(${item.x}, ${item.y}) rotate(${item.rotate}, ${item.snapshotParams.width/2}, ${item.snapshotParams.height/2})`} 
+                                                       onMouseDown={e => { e.stopPropagation(); let ids = e.shiftKey ? [...selectedPrintItemIds, item.id] : [item.id]; setSelectedPrintItemIds(ids); setInteraction({ type: 'move_print', startX: e.clientX, startY: e.clientY, initialItems: printItems.filter(i => ids.includes(i.id)).map(i => ({...i})) }); }} style={{ cursor: 'move' }}>
+                                                        <rect width={item.snapshotParams.width} height={item.snapshotParams.height} fill="none" stroke="#e2e8f0" strokeWidth="0.1" strokeDasharray="1,1" className="no-print" />
+                                                        <g transform={`translate(${SVG_PADDING}, ${SVG_PADDING})`}><Skin p={item.snapshotParams} ls={item.snapshotLayers} uniqueId={item.id} interactive={false} magsafe={item.snapshotParams.showMagSafe} mWidth={item.snapshotParams.magSafeWidth} handlers={{}} selectedLayerId={null} scale={scale} /></g>
+                                                        {selectedPrintItemIds.includes(item.id) && <rect x="-1" y="-1" width={item.snapshotParams.width+2} height={item.snapshotParams.height+2} fill="none" stroke="#6366f1" strokeWidth="0.5" strokeDasharray="3,3" className="no-print" />}
+                                                    </g>
+                                                ))}
+                                            </>
+                                        ) : (
+                                            <g transform={`translate(${WORKSPACE_MARGIN}, ${WORKSPACE_MARGIN})`}>
+                                                <Skin p={params} ls={layers} uniqueId="editor" interactive={true} magsafe={showMagSafe} mWidth={magSafeWidth} handlers={skinHandlers} selectedLayerId={selectedLayerId} scale={scale} />
+                                            </g>
+                                        )}
+                                    </svg>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+
+                    {contextMenu && (
+                        <div className="context-menu shadow-2xl" style={{ left: contextMenu.x, top: contextMenu.y }} onMouseDown={e => e.stopPropagation()}>
+                            {!isPrintMode && <button onClick={() => { duplicateLayer(contextMenu.layerId); setContextMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-indigo-50 flex items-center gap-3 transition-colors text-slate-600"><Icons.Copy /> 複製</button>}
+                            <button onClick={() => { deleteActiveSelection(); setContextMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-rose-50 text-rose-500 flex items-center gap-3 transition-colors"><Icons.Trash2 /> 削除</button>
+                        </div>
+                    )}
+                    {toast && <div className="toast">{toast}</div>}
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+    </script>
+</body>
+</html>
