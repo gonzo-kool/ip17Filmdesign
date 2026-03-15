@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="iP17 Studio">
+    <meta name="apple-mobile-web-app-title" content="iP17 Studio Pro">
     <meta name="theme-color" content="#6366f1">
     
     <title>iP17 Design & Print Studio PRO AI</title>
@@ -19,7 +19,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     
-    <!-- Firebase SDKs (Compat version) -->
+    <!-- Firebase SDKs (Compat version for stability) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
@@ -74,8 +74,9 @@
         .dropper-active { cursor: crosshair !important; }
 
         .paper-shadow {
-            box-shadow: 0 0 40px rgba(0,0,0,0.1), 0 0 10px rgba(0,0,0,0.05);
+            box-shadow: 0 10px 50px rgba(0,0,0,0.15), 0 0 10px rgba(0,0,0,0.05);
             border: 1px solid #e2e8f0;
+            background: white;
         }
     </style>
 </head>
@@ -88,7 +89,7 @@
         // --- 1. 定数 ---
         const A4_WIDTH = 210;
         const A4_HEIGHT = 297;
-        const WORKSPACE_MARGIN = 40;
+        const WORKSPACE_MARGIN = 80; // バウンディングボックスを見切れないようにするための十分な余白
 
         const IPHONE_MODELS = {
             iphone16e: { 
@@ -132,19 +133,9 @@
             Printer: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>,
             Trash2: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>,
             Copy: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>,
-            Save: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1-2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>,
-            Sparkles: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>,
             Magnet: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m6 15-4-4 6.7-6.7c.9-.9 2.3-.9 3.2 0l4.2 4.2c.9.9.9 2.3 0 3.2L9.4 18.4A4.48 4.48 0 0 1 6.3 19.7c-1.3 0-2.5-.5-3.5-1.5L6 15Z"/><path d="m9 18-4-4"/><path d="m17 13 4-4"/><path d="m15 10 4-4"/></svg>,
-            ChevronDown: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>,
-            ChevronRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="9 18 15 12 9 6"/></svg>,
-            Download: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>,
-            Upload: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>,
             Dropper: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="m10 2 2 2c.6.6.6 1.4 0 2l-1 1 5 5 1-1c.6-.6 1.4-.6 2 0l2 2c.6.6.6 1.4 0 2l-7 7c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l1-1-5-5-1 1c-.6.6-1.4.6-2 0l-2-2c-.6-.6-.6-1.4 0-2l7-7Z"/></svg>,
             CheckSquare: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
-            AlignLeft: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 2v20"/><path d="M20 6H8"/><path d="M16 12H8"/><path d="M18 18H8"/></svg>,
-            AlignCenterH: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M12 2v20"/><path d="M20 12H4"/><path d="M17 7H7"/><path d="M17 17H7"/></svg>,
-            AlignRight: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M20 2v20"/><path d="M4 6h12"/><path d="M8 12h12"/><path d="M6 18h12"/></svg>,
-            AlignTop: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M2 4h20"/><path d="M6 20V8"/><path d="M12 16V8"/><path d="M18 18V8"/></svg>,
             Folder: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
             ImageIcon: () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
         };
@@ -152,10 +143,10 @@
         // --- 3. サブコンポーネント ---
         const ParamItem = ({ label, val, onChange, max = 100, step = 0.1, unit = "mm" }) => (
             <div className="space-y-1 group text-[10px] font-bold">
-                <div className="flex justify-between items-center uppercase text-slate-500">
+                <div className="flex justify-between items-center uppercase text-slate-500 font-black">
                     <span>{label}</span>
                     <div className="flex items-center gap-1">
-                        <input type="number" step={step} value={val} onChange={e => onChange(e.target.value)} className="w-14 bg-slate-50 border rounded-lg text-right px-1.5 py-1 font-mono text-indigo-600 outline-none focus:bg-white" />
+                        <input type="number" step={step} value={val} onChange={e => onChange(e.target.value)} className="w-14 bg-slate-50 border rounded-lg text-right px-1.5 py-1 font-mono text-indigo-600 outline-none focus:bg-white shadow-sm" />
                         <span className="text-[8px] text-slate-300">{unit}</span>
                     </div>
                 </div>
@@ -176,15 +167,15 @@
                                 {p.flash && <circle cx={p.flash.x} cy={p.flash.y} r={p.flash.r} />}
                             </g>
                         </mask>
-                        <pattern id="checkerPattern" width="10" height="10" patternUnits="userSpaceOnUse">
+                        <pattern id={`checker-${uniqueId}`} width="10" height="10" patternUnits="userSpaceOnUse">
                             <rect width="10" height="10" fill="white" />
                             <rect width="5" height="5" fill="#f1f5f9" /><rect x="5" y="5" width="5" height="5" fill="#f1f5f9" />
                         </pattern>
                     </defs>
                     
-                    {showChecker && <rect width={p.width} height={p.height} fill="url(#checkerPattern)" clipPath={`url(#${clipId})`} mask={`url(#${maskId})`} />}
+                    {showChecker && <rect width={p.width} height={p.height} fill={`url(#checker-${uniqueId})`} clipPath={`url(#${clipId})`} mask={`url(#${maskId})`} pointerEvents="none" />}
 
-                    <g clipPath={`url(#${clipId})`} mask={`url(#${maskId})`}>
+                    <g clipPath={`url(#${clipId})`} mask={`url(#${maskId})`} pointerEvents="all">
                         {ls.map(l => (
                             <g key={`${uniqueId}-content-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} onContextMenu={(e) => handlers.onCtx && handlers.onCtx(e, l.id)} onClick={(e) => handlers.onClick && handlers.onClick(e, l.id)}>
                                 {l.type === 'image' ? (
@@ -197,16 +188,17 @@
                     </g>
 
                     {magsafe && (
-                        <g opacity="0.15" pointerEvents="none" className="no-print">
+                        <g opacity="0.25" className="no-print" pointerEvents="none">
                             <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth={mWidth} strokeOpacity="0.6" />
                             <circle cx={p.width/2} cy={p.magsafeY} r="27" fill="none" stroke="#000" strokeWidth="0.2" strokeDasharray="1,1" />
+                            <rect x={p.width/2 - 2.5} y={p.magsafeY + 31} width="5" height="11" rx="2.5" fill="#000" fillOpacity="0.5" />
                         </g>
                     )}
 
-                    <rect width={p.width} height={p.height} rx={p.cornerRadius} fill="none" stroke="#334155" strokeWidth={0.3} pointerEvents="none" />
-                    <rect x={p.cameraBox.x} y={p.cameraBox.y} width={p.cameraBox.w} height={p.cameraBox.h} rx={p.cameraBox.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />
+                    <rect width={p.width} height={p.height} rx={p.cornerRadius} fill="none" stroke="#334155" strokeWidth="0.3" pointerEvents="none" />
+                    <rect x={p.cameraBox.x} y={p.cameraBox.y} width={p.cameraBox.w} height={p.cameraBox.h} rx={p.cameraBox.r} fill="none" stroke="#334155" strokeWidth="0.2" pointerEvents="none" />
                     
-                    <g fill="none" stroke="#334155" strokeWidth="0.1">
+                    <g fill="none" stroke="#334155" strokeWidth="0.1" pointerEvents="none">
                         {p.cameraType === 'single-lens' ? (
                             <circle cx={p.cameraBox.x + p.cameraBox.w/2} cy={p.cameraBox.y + p.cameraBox.h/2} r="8" />
                         ) : (
@@ -216,16 +208,16 @@
                             </>
                         )}
                     </g>
-                    {p.flash && <circle cx={p.flash.x} cy={p.flash.y} r={p.flash.r} fill="none" stroke="#334155" strokeWidth={0.2} pointerEvents="none" />}
+                    {p.flash && <circle cx={p.flash.x} cy={p.flash.y} r={p.flash.r} fill="none" stroke="#334155" strokeWidth="0.2" pointerEvents="none" />}
 
                     {interactive && ls.map(l => {
                         if (selectedLayerId !== l.id) return null;
                         const hw = l.type === 'image' ? l.w : l.fontSize * 4, hh = l.type === 'image' ? l.h : l.fontSize;
                         return (
-                            <g key={`${uniqueId}-handle-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} pointerEvents="none">
-                                <rect x={l.x-hw/2} y={l.y-hh/2} width={hw} height={hh} fill="none" stroke="#6366f1" strokeWidth={1/scale} strokeDasharray="2,2" />
-                                <circle cx={l.x+hw/2} cy={l.y+hh/2} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2/scale} pointerEvents="all" style={{ cursor: 'nwse-resize' }} onMouseDown={(e) => handlers.onDown(e, 'resize', l.id)} />
-                                <circle cx={l.x} cy={l.y-hh/2-20/scale} r={8/scale} fill="white" stroke="#6366f1" strokeWidth={2/scale} pointerEvents="all" style={{ cursor: 'alias' }} onMouseDown={(e) => handlers.onDown(e, 'rotate', l.id)} />
+                            <g key={`${uniqueId}-handle-${l.id}`} transform={`rotate(${l.rotate}, ${l.x}, ${l.y})`} pointerEvents="all">
+                                <rect x={l.x-hw/2} y={l.y-hh/2} width={hw} height={hh} fill="none" stroke="#6366f1" strokeWidth={1.5/scale} strokeDasharray="3,3" pointerEvents="none" />
+                                <circle cx={l.x+hw/2} cy={l.y+hh/2} r={10/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'nwse-resize' }} onMouseDown={(e) => handlers.onDown(e, 'resize', l.id)} />
+                                <circle cx={l.x} cy={l.y-hh/2-25/scale} r={10/scale} fill="white" stroke="#6366f1" strokeWidth={2.5/scale} style={{ cursor: 'alias' }} onMouseDown={(e) => handlers.onDown(e, 'rotate', l.id)} />
                             </g>
                         );
                     })}
@@ -234,9 +226,9 @@
         };
 
         const App = () => {
-            // --- 4. ステート宣言 (ReferenceErrorを防ぐために最上部に配置) ---
-            const [selectedModel, setSelectedModel] = useState('iphone16e');
-            const [params, setParams] = useState(IPHONE_MODELS.iphone16e);
+            // ステート宣言
+            const [selectedModel, setSelectedModel] = useState('standard');
+            const [params, setParams] = useState(IPHONE_MODELS.standard);
             const [layers, setLayers] = useState([]);
             const [selectedLayerId, setSelectedLayerId] = useState(null);
             const [printItems, setPrintItems] = useState([]);
@@ -245,7 +237,7 @@
             const [showMagSafe, setShowMagSafe] = useState(false);
             const [magSafeWidth, setMagSafeWidth] = useState(5.0);
             const [activeTab, setActiveTab] = useState('template');
-            const [scale, setScale] = useState(3.5);
+            const [scale, setScale] = useState(3.0);
             const [projectName, setProjectName] = useState("");
             const [toast, setToast] = useState(null);
             const [contextMenu, setContextMenu] = useState(null);
@@ -256,7 +248,7 @@
             const mainRef = useRef(null);
             const svgRef = useRef(null);
 
-            // --- 5. ハンドラー群 ---
+            // ハンドラー
             const showToast = useCallback((msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); }, []);
 
             const updateScale = useCallback(() => {
@@ -264,46 +256,71 @@
                 const { offsetWidth, offsetHeight } = mainRef.current;
                 const targetW = isPrintMode ? A4_WIDTH : params.width + WORKSPACE_MARGIN * 2;
                 const targetH = isPrintMode ? A4_HEIGHT : params.height + WORKSPACE_MARGIN * 2;
-                setScale(Math.max(0.5, Math.min((offsetWidth - 60) / targetW, (offsetHeight - 60) / targetH, 8.0)));
+                const calcScale = Math.min((offsetWidth - 60) / targetW, (offsetHeight - 60) / targetH);
+                setScale(Math.max(0.1, Math.min(calcScale, 8.0)));
             }, [isPrintMode, params.width, params.height]);
 
-            const handleParamChange = useCallback((cat, key, val) => {
-                const num = val === "" ? 0 : parseFloat(val);
-                if (cat) setParams(p => ({ ...p, [cat]: { ...p[cat], [key]: num } }));
-                else setParams(p => ({ ...p, [key]: num }));
-            }, []);
+            const handleMouseDown = useCallback((e, type, id) => {
+                if(isDropperActive) return; 
+                e.stopPropagation();
+                setContextMenu(null);
+                
+                if(isPrintMode) {
+                    const item = printItems.find(i => i.id === id); if(!item) return;
+                    setSelectedPrintItemIds([id]);
+                    setInteraction({ type: 'move_print', startX: e.clientX, startY: e.clientY, initialItems: [JSON.parse(JSON.stringify(item))] });
+                } else {
+                    const layer = layers.find(l => l.id === id); if(!layer) return;
+                    setSelectedLayerId(id);
+                    setInteraction({ type, startX: e.clientX, startY: e.clientY, initialLayer: JSON.parse(JSON.stringify(layer)) });
+                }
+            }, [isDropperActive, isPrintMode, printItems, layers]);
 
-            const processChromaKey = useCallback((originalSrc, color, tolerance) => {
-                return new Promise(resolve => {
-                    const img = new Image(); img.src = originalSrc;
-                    img.onload = () => {
-                        const c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
-                        const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
-                        const id = ctx.getImageData(0,0,c.width,c.height); const d = id.data;
-                        const target = color.match(/[A-Za-z0-9]{2}/g).map(v => parseInt(v, 16));
-                        for(let i=0; i<d.length; i+=4) {
-                            const diff = Math.sqrt(Math.pow(d[i]-target[0],2) + Math.pow(d[i+1]-target[1],2) + Math.pow(d[i+2]-target[2],2));
-                            if(diff < tolerance) d[i+3] = 0;
-                        }
-                        ctx.putImageData(id, 0, 0); resolve(c.toDataURL());
-                    };
-                });
-            }, []);
+            const handleContextMenu = useCallback((e, layerId) => {
+                if (isPrintMode || isDropperActive) return;
+                e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layerId); setContextMenu({ x: e.clientX, y: e.clientY, layerId });
+            }, [isPrintMode, isDropperActive]);
 
             const updateLayer = useCallback(async (id, updates) => {
                 setLayers(prev => {
                     const idx = prev.findIndex(l => l.id === id); if(idx === -1) return prev;
-                    const layer = { ...prev[idx], ...updates };
-                    const next = [...prev]; next[idx] = layer;
-                    if(layer.type === 'image' && (updates.chromaKeyEnabled !== undefined || updates.chromaKeyColor !== undefined || updates.chromaKeyTolerance !== undefined)) {
-                        (async () => {
-                            const src = layer.chromaKeyEnabled ? await processChromaKey(layer.originalSrc, layer.chromaKeyColor, layer.chromaKeyTolerance) : layer.originalSrc;
-                            setLayers(curr => curr.map(l => l.id === id ? { ...l, src } : l));
-                        })();
-                    }
+                    const next = [...prev]; next[idx] = { ...prev[idx], ...updates };
                     return next;
                 });
-            }, [processChromaKey]);
+            }, []);
+
+            const addToPaper = useCallback(() => {
+                const newItem = { 
+                    id: "print-" + Date.now(), 
+                    x: 10, y: 10, rotate: 0, 
+                    snapshotLayers: JSON.parse(JSON.stringify(layers)), 
+                    snapshotParams: JSON.parse(JSON.stringify({...params, showMagSafe}))
+                };
+                setPrintItems(prev => [...prev, newItem]); 
+                setSelectedPrintItemIds([newItem.id]); 
+                setIsPrintMode(true); 
+                setActiveTab('layers');
+            }, [layers, params, showMagSafe]);
+
+            const exportToJson = useCallback(() => {
+                const data = { version: "2.1", projectName, selectedModel, params, layers, printItems, showMagSafe };
+                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${projectName || 'project'}.json`; a.click();
+                showToast("JSON保存完了");
+            }, [projectName, selectedModel, params, layers, printItems, showMagSafe, showToast]);
+
+            const importFromJson = useCallback((e) => {
+                const f = e.target.files[0]; if(!f) return;
+                const r = new FileReader(); r.onload = (ev) => {
+                    try {
+                        const d = JSON.parse(ev.target.result);
+                        if(d.params && d.layers) {
+                            setParams(d.params); setLayers(d.layers); setPrintItems(d.printItems || []);
+                            setSelectedModel(d.selectedModel || 'standard'); setProjectName(d.projectName || ""); showToast("読込完了");
+                        }
+                    } catch(err) { showToast("無効なJSONです"); }
+                }; r.readAsText(f); e.target.value = "";
+            }, [showToast]);
 
             const pickColorFromCanvas = useCallback((e, layerId) => {
                 if(!isDropperActive) return;
@@ -321,65 +338,31 @@
                     const ctx = c.getContext('2d'); ctx.drawImage(img, 0, 0);
                     const p = ctx.getImageData(Math.floor(relX * img.width), Math.floor(relY * img.height), 1, 1).data;
                     const hex = "#" + ("000000" + ((p[0] << 16) | (p[1] << 8) | p[2]).toString(16)).slice(-6);
-                    updateLayer(layerId, { chromaKeyColor: hex, chromaKeyEnabled: true });
+                    (async () => {
+                        const img2 = new Image(); img2.src = layer.originalSrc;
+                        img2.onload = () => {
+                            const c2 = document.createElement('canvas'); c2.width = img2.width; c2.height = img2.height;
+                            const ctx2 = c2.getContext('2d'); ctx2.drawImage(img2, 0, 0);
+                            const id2 = ctx2.getImageData(0,0,c2.width,c2.height); const d2 = id2.data;
+                            const t = hex.match(/[A-Za-z0-9]{2}/g).map(v => parseInt(v, 16));
+                            for(let i=0; i<d2.length; i+=4) {
+                                const diff = Math.sqrt(Math.pow(d2[i]-t[0],2) + Math.pow(d2[i+1]-t[1],2) + Math.pow(d2[i+2]-t[2],2));
+                                if(diff < layer.chromaKeyTolerance) d2[i+3] = 0;
+                            }
+                            ctx2.putImageData(id2, 0, 0);
+                            setLayers(prev => prev.map(l => l.id === layerId ? { ...l, chromaKeyColor: hex, chromaKeyEnabled: true, src: c2.toDataURL() } : l));
+                        };
+                    })();
                     setIsDropperActive(false); showToast("色を抽出しました");
                 };
-            }, [isDropperActive, layers, scale, updateLayer, showToast]);
+            }, [isDropperActive, layers, scale, showToast]);
 
-            const handleMouseDown = useCallback((e, type, id) => {
-                if(isDropperActive) return; e.stopPropagation();
-                setContextMenu(null);
-                if(isPrintMode) {
-                    const item = printItems.find(i => i.id === id); if(!item) return;
-                    setSelectedPrintItemIds(prev => e.shiftKey ? [...prev, id] : [id]);
-                    setInteraction({ type: 'move_print', startX: e.clientX, startY: e.clientY, initialItems: printItems.filter(i => (e.shiftKey ? [...selectedPrintItemIds, id].includes(i.id) : i.id === id)).map(i => ({...i})) });
-                } else {
-                    const layer = layers.find(l => l.id === id); if(!layer) return;
-                    setSelectedLayerId(id);
-                    setInteraction({ type, startX: e.clientX, startY: e.clientY, initialLayer: { ...layer } });
-                }
-            }, [isDropperActive, isPrintMode, printItems, selectedPrintItemIds, layers]);
-
-            const handleContextMenu = useCallback((e, layerId) => {
-                if (isPrintMode || isDropperActive) return;
-                e.preventDefault(); e.stopPropagation(); setSelectedLayerId(layerId); setContextMenu({ x: e.clientX, y: e.clientY, layerId });
-            }, [isPrintMode, isDropperActive]);
-
-            const addToPaper = useCallback(() => {
-                const newItem = { id: Date.now(), x: 10, y: 10, rotate: 0, snapshotLayers: JSON.parse(JSON.stringify(layers)), snapshotParams: JSON.parse(JSON.stringify(params)) };
-                setPrintItems(prev => [...prev, newItem]); setSelectedPrintItemIds([newItem.id]); setIsPrintMode(true); setActiveTab('layers');
-            }, [layers, params]);
-
-            const deleteActiveSelection = useCallback(() => {
-                if (isPrintMode) { setPrintItems(prev => prev.filter(i => !selectedPrintItemIds.includes(i.id))); setSelectedPrintItemIds([]); }
-                else if (selectedLayerId) { setLayers(prev => prev.filter(l => l.id !== selectedLayerId)); setSelectedLayerId(null); }
-            }, [isPrintMode, selectedPrintItemIds, selectedLayerId]);
-
-            const exportToJson = useCallback(() => {
-                const data = { version: "1.5", projectName, selectedModel, params, layers, printItems, showMagSafe };
-                const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${projectName || 'project'}.json`; a.click();
-                showToast("JSON保存完了");
-            }, [projectName, selectedModel, params, layers, printItems, showMagSafe, showToast]);
-
-            const importFromJson = useCallback((e) => {
-                const f = e.target.files[0]; if(!f) return;
-                const r = new FileReader(); r.onload = (ev) => {
-                    try {
-                        const d = JSON.parse(ev.target.result);
-                        if(d.params && d.layers) {
-                            setProjectName(d.projectName || ""); setParams(d.params); setLayers(d.layers); setPrintItems(d.printItems || []);
-                            setSelectedModel(d.selectedModel || 'standard'); showToast("読み込み完了");
-                        }
-                    } catch(err) { showToast("無効なJSONです"); }
-                }; r.readAsText(f); e.target.value = "";
-            }, [showToast]);
-
-            // --- 6. Effects ---
             useEffect(() => {
                 const onMove = (e) => {
                     if(!interaction.type) return;
-                    const dx = (e.clientX - interaction.startX) / scale, dy = (e.clientY - interaction.startY) / scale;
+                    const dx = (e.clientX - interaction.startX) / scale;
+                    const dy = (e.clientY - interaction.startY) / scale;
+                    
                     if(interaction.type === 'move_print') {
                         setPrintItems(prev => prev.map(it => {
                             const init = interaction.initialItems.find(ii => ii.id === it.id);
@@ -388,12 +371,13 @@
                     } else if(interaction.type === 'move') {
                         updateLayer(interaction.initialLayer.id, { x: interaction.initialLayer.x + dx, y: interaction.initialLayer.y + dy });
                     } else if(interaction.type === 'resize') {
-                        updateLayer(interaction.initialLayer.id, { w: Math.max(2, interaction.initialLayer.w + dx*2), h: Math.max(2, interaction.initialLayer.h + dy*2) });
+                        updateLayer(interaction.initialLayer.id, { w: Math.max(2, interaction.initialLayer.w + dx * 2), h: Math.max(2, interaction.initialLayer.h + dy * 2) });
                     } else if(interaction.type === 'rotate') {
-                        const rect = mainRef.current.getBoundingClientRect();
-                        const cx = rect.left + (params.width/2 + WORKSPACE_MARGIN) * scale;
-                        const cy = rect.top + (params.height/2 + WORKSPACE_MARGIN) * scale;
-                        let angle = Math.atan2(e.clientY - cy, e.clientX - cx) * (180 / Math.PI) + 90;
+                        const rect = svgRef.current.getBoundingClientRect();
+                        // 修正: レイヤーの中心を回転中心として計算
+                        const centerX = rect.left + (interaction.initialLayer.x + WORKSPACE_MARGIN) * scale;
+                        const centerY = rect.top + (interaction.initialLayer.y + WORKSPACE_MARGIN) * scale;
+                        let angle = Math.atan2(e.clientY - centerY, e.clientX - centerX) * (180 / Math.PI) + 90;
                         if(e.ctrlKey) angle = Math.round(angle / 45) * 45;
                         updateLayer(interaction.initialLayer.id, { rotate: Math.round(angle) });
                     }
@@ -401,7 +385,7 @@
                 const onUp = () => setInteraction({ type: null });
                 window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
                 return () => { window.removeEventListener('mousemove', onMove); window.removeEventListener('mouseup', onUp); };
-            }, [interaction, scale, params.width, params.height, updateLayer]);
+            }, [interaction, scale, updateLayer]);
 
             useEffect(() => { updateScale(); window.addEventListener('resize', updateScale); return () => window.removeEventListener('resize', updateScale); }, [updateScale]);
 
@@ -417,18 +401,18 @@
                 <div className={`flex flex-col h-screen overflow-hidden ${isDropperActive ? 'dropper-active' : ''}`}>
                     <header className="px-6 py-4 bg-white border-b flex justify-between items-center z-40 no-print shadow-sm font-black uppercase">
                         <div className="flex items-center gap-4">
-                            <div className="bg-indigo-600 text-white p-2 rounded-xl shadow-lg"><Icons.Smartphone/></div>
+                            <div className="bg-indigo-600 text-white p-2 rounded-xl"><Icons.Smartphone/></div>
                             <h1 className="text-sm tracking-tighter">iP17 Studio <span className="text-indigo-600 italic">PRO</span></h1>
                         </div>
                         <div className="flex gap-2">
-                            <button onClick={() => { setIsPrintMode(!isPrintMode); setSelectedPrintItemIds([]); setActiveTab('template'); }} className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${isPrintMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border text-slate-600'}`}>
+                            <button onClick={() => { setIsPrintMode(!isPrintMode); setSelectedPrintItemIds([]); setActiveTab(isPrintMode ? 'template' : 'layers'); }} className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all flex items-center gap-2 ${isPrintMode ? 'bg-indigo-600 text-white shadow-lg' : 'bg-white border border-slate-200 text-slate-600'}`}>
                                 {isPrintMode ? <Icons.Smartphone/> : <Icons.Grid3X3/>} {isPrintMode ? 'エディタ' : '印刷レイアウト'}
                             </button>
                             <button onClick={() => window.print()} className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-black text-xs active:scale-95 shadow-lg"><Icons.Printer/> PRINT</button>
                         </div>
                     </header>
 
-                    <div className="flex flex-1 overflow-hidden">
+                    <div className="flex flex-1 overflow-hidden font-black uppercase tracking-widest">
                         <aside className="w-80 bg-white border-r flex flex-col no-print z-30 shadow-xl overflow-hidden font-bold">
                             <div className="flex border-b bg-slate-50/50">
                                 {['template', 'layers', 'design', 'save'].map(t => (
@@ -439,19 +423,19 @@
                             </div>
                             <div className="flex-1 overflow-y-auto p-5 space-y-6 scrollbar-hide pb-24 font-black">
                                 {activeTab === 'template' && (
-                                    <div className="space-y-6 animate-in slide-in-from-left-4 font-black uppercase">
+                                    <div className="space-y-6 animate-in slide-in-from-left-4">
                                         {!isPrintMode ? (
                                             <>
                                                 <div>
-                                                    <h3 className="text-slate-400 px-1 mb-2 text-[9px]">モデル</h3>
+                                                    <h3 className="text-slate-400 px-1 mb-2 text-[9px]">Model</h3>
                                                     <div className="grid grid-cols-2 gap-2">
-                                                        {Object.keys(IPHONE_MODELS).map(k => <button key={k} onClick={() => { setSelectedModel(k); setParams(IPHONE_MODELS[k]); }} className={`py-2 rounded-lg text-[10px] border transition-all ${selectedModel === k ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white text-slate-600 hover:border-indigo-200'}`}>{IPHONE_MODELS[k].name}</button>)}
+                                                        {Object.keys(IPHONE_MODELS).map(k => <button key={k} onClick={() => { setSelectedModel(k); setParams(IPHONE_MODELS[k]); }} className={`py-2 rounded-lg text-[10px] border transition-all ${selectedModel === k ? 'bg-indigo-600 text-white border-indigo-600 shadow-md' : 'bg-white border-slate-200 text-slate-600'}`}>{IPHONE_MODELS[k].name}</button>)}
                                                     </div>
                                                 </div>
                                                 <button onClick={addToPaper} className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black shadow-lg flex items-center justify-center gap-2 active:scale-95 transition-all"><Icons.PlusSquare/> 用紙に追加</button>
-                                                <div className="pt-4 border-t space-y-3">
+                                                <div className="pt-4 border-t space-y-3 font-black">
                                                     <label className="flex items-center justify-between p-3 bg-slate-50 border rounded-xl cursor-pointer">
-                                                        <div className="flex items-center gap-2 text-slate-600"><Icons.Magnet />MagSafe ガイド</div>
+                                                        <div className="flex items-center gap-2 text-slate-600 font-black"><Icons.Magnet />MagSafe ガイド</div>
                                                         <input type="checkbox" checked={showMagSafe} onChange={e => setShowMagSafe(e.target.checked)} className="accent-indigo-600 w-4 h-4" />
                                                     </label>
                                                 </div>
@@ -460,7 +444,7 @@
                                     </div>
                                 )}
                                 {activeTab === 'layers' && (
-                                    <div className="space-y-3 font-black uppercase">
+                                    <div className="space-y-3">
                                         {!isPrintMode ? (
                                             <>
                                                 <button onClick={() => {
@@ -469,20 +453,19 @@
                                                         const nl={id:Date.now(), type:'image', originalSrc:ev.target.result, src:ev.target.result, x:params.width/2, y:params.height/2, w:40, h:40, rotate:0, opacity:1, name:`画像 ${layers.length+1}`, chromaKeyEnabled: false, chromaKeyColor: "#ffffff", chromaKeyTolerance: 50};
                                                         setLayers(p=>[...p, nl]); setSelectedLayerId(nl.id); setActiveTab('design');
                                                     }; r.readAsDataURL(f); }; i.click();
-                                                }} className="w-full py-4 bg-slate-50 border border-dashed rounded-xl font-black flex items-center justify-center gap-2 mb-4 hover:bg-white transition-all text-slate-600 tracking-tighter uppercase font-black"><Icons.ImageIcon/> 画像を追加</button>
+                                                }} className="w-full py-4 bg-slate-50 border border-dashed rounded-xl font-black flex items-center justify-center gap-2 mb-4 hover:bg-white transition-all text-slate-600"><Icons.ImageIcon/> 画像を追加</button>
                                                 {[...layers].reverse().map(l => (
-                                                    <div key={l.id} onClick={() => setSelectedLayerId(l.id)} className={`p-3 rounded-2xl border flex justify-between items-center transition-all ${selectedLayerId === l.id ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-50' : 'bg-white border-slate-100'}`}>
-                                                        <span className="truncate w-40 text-slate-700 font-black tracking-tighter leading-none">{l.name}</span>
+                                                    <div key={l.id} onClick={() => setSelectedLayerId(l.id)} className={`p-3 rounded-2xl border flex justify-between items-center transition-all ${selectedLayerId === l.id ? 'bg-indigo-50 border-indigo-300 ring-2 ring-indigo-50' : 'bg-white border-slate-100 shadow-sm'}`}>
+                                                        <span className="truncate w-40 text-slate-700 font-black tracking-tighter leading-none font-black">{l.name}</span>
                                                         <button onClick={e => {e.stopPropagation(); setLayers(p => p.filter(la => la.id !== l.id)); if(selectedLayerId === l.id) setSelectedLayerId(null);}} className="text-slate-300 hover:text-rose-500 transition-all font-black"><Icons.Trash2/></button>
                                                     </div>
                                                 ))}
-                                                {layers.length === 0 && <div className="text-center py-20 text-slate-300 font-black opacity-20 italic">No Layers</div>}
                                             </>
                                         ) : (
                                             printItems.map((item, idx) => (
-                                                <div key={item.id} onClick={() => setSelectedPrintItemIds([item.id])} className={`p-4 rounded-2xl border transition-all cursor-pointer ${selectedPrintItemIds.includes(item.id) ? 'bg-indigo-50 border-indigo-300 ring-4 ring-indigo-50 shadow-inner' : 'bg-white border-slate-100'}`}>
+                                                <div key={item.id} onClick={() => setSelectedPrintItemIds([item.id])} className={`p-4 rounded-2xl border transition-all cursor-pointer ${selectedPrintItemIds.includes(item.id) ? 'bg-indigo-50 border-indigo-300 ring-4 ring-indigo-50 shadow-inner' : 'bg-white border-slate-100 shadow-sm'}`}>
                                                     <div className="font-black text-slate-800 uppercase tracking-tighter leading-none">配置デザイン #{idx + 1}</div>
-                                                    <div className="text-[8px] text-slate-400 mt-2 uppercase font-black">{item.snapshotParams.name}</div>
+                                                    <div className="text-[8px] text-slate-400 mt-2 uppercase font-black font-black uppercase">{item.snapshotParams.name}</div>
                                                     <button onClick={(e) => { e.stopPropagation(); setPrintItems(prev => prev.filter(i => i.id !== item.id)); }} className="mt-2 text-rose-500 text-[8px] uppercase font-black underline">[削除]</button>
                                                 </div>
                                             ))
@@ -498,17 +481,17 @@
                                             <ParamItem label="回転" val={selectedLayer.rotate} onChange={v => updateLayer(selectedLayer.id, { rotate: parseFloat(v) })} max={360} />
                                         </div>
                                         {selectedLayer.type === 'image' && (
-                                            <div className="pt-4 border-t space-y-4">
+                                            <div className="pt-4 border-t space-y-4 font-black">
                                                 <div className="flex items-center justify-between p-3 bg-slate-900 text-white rounded-xl shadow-lg font-black italic">
-                                                    <div className="flex items-center gap-2 font-black italic uppercase"><Icons.Dropper/> Chroma Key</div>
+                                                    <div className="flex items-center gap-2 uppercase tracking-tighter"><Icons.Dropper/> Chroma Key</div>
                                                     <input type="checkbox" checked={selectedLayer.chromaKeyEnabled} onChange={e => updateLayer(selectedLayer.id, { chromaKeyEnabled: e.target.checked })} className="w-4 h-4 accent-indigo-400" />
                                                 </div>
                                                 {selectedLayer.chromaKeyEnabled && (
                                                     <div className="space-y-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 animate-in fade-in font-black uppercase">
                                                         <div className="flex items-center justify-between p-2 bg-white rounded-xl border">
                                                             <div className="flex items-center gap-3">
-                                                                <input type="color" value={selectedLayer.chromaKeyColor} onChange={e => updateLayer(selectedLayer.id, { chromaKeyColor: e.target.value })} className="w-8 h-8 border-0 rounded-lg cursor-pointer" />
-                                                                <span className="text-[10px] font-black">{selectedLayer.chromaKeyColor}</span>
+                                                                <input type="color" value={selectedLayer.chromaKeyColor} onChange={e => updateLayer(selectedLayer.id, { chromaKeyColor: e.target.value })} className="w-8 h-8 border-0 rounded-lg cursor-pointer shadow-inner" />
+                                                                <span className="text-[10px] font-black uppercase">{selectedLayer.chromaKeyColor}</span>
                                                             </div>
                                                             <button onClick={() => { setIsDropperActive(!isDropperActive); if(!isDropperActive) showToast("画像上の色をクリックしてください"); }} className={`p-2 rounded-lg transition-all ${isDropperActive ? 'bg-indigo-600 text-white scale-110 shadow-md' : 'bg-slate-100 text-slate-400'}`}>
                                                                 <Icons.Dropper/>
@@ -529,7 +512,7 @@
                                     <div className="space-y-6 animate-in slide-in-from-left-4 font-black uppercase">
                                         <div className="p-4 bg-slate-900 text-white rounded-2xl space-y-4 shadow-xl">
                                             <h3 className="text-indigo-400 flex items-center gap-2 tracking-widest"><Icons.Folder/> 保存 (JSON)</h3>
-                                            <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="名前を入力..." className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs outline-none font-black" />
+                                            <input value={projectName} onChange={e => setProjectName(e.target.value)} placeholder="File Name..." className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-xs outline-none font-black text-indigo-400" />
                                             <div className="grid grid-cols-2 gap-2">
                                                 <button onClick={exportToJson} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all font-black"><Icons.Download/> 書き出し</button>
                                                 <button onClick={() => document.getElementById('json-import-trigger').click()} className="py-3 bg-slate-800 border border-slate-700 rounded-xl flex flex-col items-center gap-1 hover:bg-slate-700 transition-all font-black"><Icons.Upload/> 読み込み</button>
@@ -541,29 +524,30 @@
                             </div>
                         </aside>
 
-                        <main ref={mainRef} className="flex-1 bg-slate-200 flex items-center justify-center overflow-hidden relative p-8 cursor-default" onMouseDown={(e) => { setSelectedLayerId(null); setSelectedPrintItemIds([]); setContextMenu(null); }}>
-                            <div className={isPrintMode ? "printable-area" : "paper-shadow"}>
-                                <div id="capture-area" className={`transition-all duration-300 relative bg-white`} 
+                        <main ref={mainRef} className="flex-1 bg-slate-200 flex items-center justify-center overflow-auto relative p-8 cursor-default" onMouseDown={() => { setSelectedLayerId(null); setSelectedPrintItemIds([]); setContextMenu(null); }}>
+                            <div className="paper-shadow">
+                                <div id="capture-area" className="transition-all duration-300 relative bg-white" 
                                      style={{ 
-                                         width: isPrintMode ? '210mm' : (params.width + WORKSPACE_MARGIN * 2) * scale, 
-                                         height: isPrintMode ? '297mm' : (params.height + WORKSPACE_MARGIN * 2) * scale 
+                                         width: isPrintMode ? A4_WIDTH * scale : (params.width + WORKSPACE_MARGIN * 2) * scale, 
+                                         height: isPrintMode ? A4_HEIGHT * scale : (params.height + WORKSPACE_MARGIN * 2) * scale 
                                      }}>
                                     <svg 
                                         ref={svgRef}
-                                        viewBox={`0 0 ${isPrintMode ? 210 : params.width + WORKSPACE_MARGIN * 2} ${isPrintMode ? 297 : params.height + WORKSPACE_MARGIN * 2}`} 
-                                        width={isPrintMode ? "210mm" : "100%"} height={isPrintMode ? "297mm" : "100%"} xmlns="http://www.w3.org/2000/svg"
+                                        viewBox={`0 0 ${isPrintMode ? A4_WIDTH : params.width + WORKSPACE_MARGIN * 2} ${isPrintMode ? A4_HEIGHT : params.height + WORKSPACE_MARGIN * 2}`} 
+                                        width="100%" height="100%" xmlns="http://www.w3.org/2000/svg"
                                     >
                                         {isPrintMode ? (
                                             <>
-                                                <rect width="210" height="297" fill="white" />
+                                                <rect width={A4_WIDTH} height={A4_HEIGHT} fill="white" />
                                                 {printItems.map(item => (
-                                                    <g key={item.id} transform={`translate(${item.x}, ${item.y}) rotate(${item.rotate}, ${params.width/2}, ${params.height/2})`} 
-                                                       onMouseDown={e => { e.stopPropagation(); setSelectedPrintItemIds([item.id]); handleMouseDown(e, 'move_print', item.id); }}>
-                                                        <rect width={params.width} height={params.height} fill="none" stroke="#e2e8f0" strokeWidth="0.1" strokeDasharray="1,1" className="no-print" />
-                                                        <Skin p={item.snapshotParams} ls={item.snapshotLayers} uniqueId={item.id} interactive={false} magsafe={false} mWidth={5} handlers={{}} selectedLayerId={null} scale={1} showChecker={false} />
-                                                        {selectedPrintItemIds.includes(item.id) && <rect x="-1" y="-1" width={params.width+2} height={params.height+2} fill="none" stroke="#6366f1" strokeWidth="0.5" strokeDasharray="3,3" className="no-print" />}
+                                                    <g key={item.id} transform={`translate(${item.x}, ${item.y}) rotate(${item.rotate}, ${item.snapshotParams.width/2}, ${item.snapshotParams.height/2})`} 
+                                                       onMouseDown={e => { e.stopPropagation(); handleMouseDown(e, 'move_print', item.id); }}>
+                                                        <rect width={item.snapshotParams.width} height={item.snapshotParams.height} fill="none" stroke="#e2e8f0" strokeWidth="0.1" strokeDasharray="1,1" className="no-print" />
+                                                        <Skin p={item.snapshotParams} ls={item.snapshotLayers} uniqueId={item.id} interactive={false} magsafe={showMagSafe} mWidth={5} handlers={{}} selectedLayerId={null} scale={1} showChecker={false} />
+                                                        {selectedPrintItemIds.includes(item.id) && <rect x="-1" y="-1" width={item.snapshotParams.width+2} height={item.snapshotParams.height+2} fill="none" stroke="#6366f1" strokeWidth={1} strokeDasharray="3,3" className="no-print" />}
                                                     </g>
                                                 ))}
+                                                <rect width={A4_WIDTH} height={A4_HEIGHT} fill="none" stroke="#e2e8f0" strokeWidth="0.5" className="no-print" />
                                             </>
                                         ) : (
                                             <g transform={`translate(${WORKSPACE_MARGIN}, ${WORKSPACE_MARGIN})`}>
@@ -582,8 +566,8 @@
                                 const layer = layers.find(l => l.id === contextMenu.layerId);
                                 if(layer) { const nl = {...layer, id: Date.now(), x: layer.x+5, y: layer.y+5}; setLayers([...layers, nl]); setSelectedLayerId(nl.id); }
                                 setContextMenu(null); 
-                            }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-indigo-50 flex items-center gap-3 transition-colors text-slate-600 font-black italic font-black font-black uppercase font-black font-black uppercase font-black font-black uppercase"><Icons.Copy /> 複製を作成</button>
-                            <button onClick={() => { deleteActiveSelection(); setContextMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-rose-50 text-rose-500 flex items-center gap-3 transition-colors font-black italic font-black font-black uppercase font-black font-black uppercase font-black font-black uppercase"><Icons.Trash2 /> 選択を削除</button>
+                            }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-indigo-50 flex items-center gap-3 transition-colors text-slate-600 font-black italic"><Icons.Copy /> 複製を作成</button>
+                            <button onClick={() => { deleteActiveSelection(); setContextMenu(null); }} className="w-full text-left px-3 py-2.5 text-xs font-bold hover:bg-rose-50 text-rose-500 flex items-center gap-3 transition-colors font-black italic"><Icons.Trash2 /> 選択を削除</button>
                         </div>
                     )}
                     {toast && <div className="toast font-black uppercase tracking-tighter">{toast}</div>}
